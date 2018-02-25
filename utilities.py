@@ -16,3 +16,10 @@ async def compress_file(path):
     cmd = ['lbzip2', '-k', '-n 8', '-z', path.expanduser().resolve()]
     process = await asyncio.create_subprocess_exec(*cmd)
     return await process.wait()
+
+async def stack_files(paths):
+    '''Stack the files using imod. Return only after stacking complete.
+    '''
+    cmd = ['newstack', *paths]
+    process = await asyncio.create_subprocess_exec(*cmd)
+    return await process.wait()

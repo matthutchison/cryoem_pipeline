@@ -2,6 +2,7 @@ from transitions import Machine
 from monitor import FilePatternMonitor
 from utilities import safe_copy_file, compress_file
 import asyncio
+import logging
 import os
 import pathlib
 import shutil
@@ -11,15 +12,16 @@ class Project():
     '''Overarching project controller
     '''
 
-    def __init__(self, project, pattern):
+    def __init__(self, project, pattern, frames=1):
         self.project = project
         self.workflow = Workflow()
         self.async = AsyncWorkflowHelper()
         self.monitor = FilePatternMonitor(pattern)
         self.paths = {
-                'project_root': '/tmp/' + str(project),
+                'local_root': '/tmp/' + str(project),
                 'storage_root': '/mnt/moab/' + str(project)
                 }
+        self.frames = frames
 
     def start(self):
         self.async.loop.run_until_complete(self._async_start())
@@ -53,7 +55,7 @@ class Workflow(Machine):
                 initial='initial',
                 auto_transitions=False)
         self.add_transition('initialize', source='initial', dest='creating')
-        self.add_transition('import', source='creating', dest='importing')
+        self.add_transition('import_file', source='creating', dest='importing')
         self.add_transition('stack', source='importing', dest='stacking')
         self.add_transition('compress', source=['importing', 'stacking'],
                 dest='compressing')
@@ -79,6 +81,9 @@ class WorkflowItem():
         '''
         return int(time.time()) - os.stat(path).st_mtime
 
+    def _is_processing_complete(self, path):
+        raise NotImplementedError
+
     def on_enter_creating(self):
         '''Check that the file has finished creation, then transition state
 
@@ -87,45 +92,69 @@ class WorkflowItem():
         fancier like inotify.
         '''
         dt = _delta_mtime(self.path)
-        if dt > 15
-            self.import()
-        else:
-            self.async.add_timed_callback(on_enter_creating, 16 - dt)
+        self.import_file() if dt > 15 else self.async.add_timed_callback(
+                on_enter_creating, 16 - dt)
 
     def on_enter_importing(self):
         '''Copy (import) the file to local storage for processing.
         '''
         self.files['local_original'] = pathlib.Path(
-                self.project.paths['local_storage'],
+                self.project.paths['local_root'],
                 self.files['original'].name)
         safe_copy_file(self.files['original'],
                 self.files['local_original'])
+        if self.project.frames > 1:
+            self.stack()
+        else:
+            self.files['local_stack'] = self.files['local_original']
+            self.compress()
         
     def on_enter_stacking(self):
         '''Stack the files if the stack parameter evaluates True.
+
+        Cycle until all of the relevant files are copied local, then stack and
+        export a single time.
         '''
+
         #TODO: add stacking code
-        pass
+        raise NotImplementedError
 
     def on_enter_compressing(self):
         self.async.create_task(compress_file(self.files['local_stack']),
             done_cb=_compressing_cb)
+        self.files['local_compressed'] = self.files['local_stack'].with_suffix(
+                self.files['local_stack'].suffix + '.bz2')
 
     def _compressing_cb(self, fut):
-        if fut.done():
-            pass
+        self.export() if not fut.exception() else self.compress()
 
     def on_enter_exporting(self):
-        pass
+        '''Export (copy) the compressed file to the storage location
+        '''
+        self.files['storage_final'] = pathlib.Path(
+                self.project.paths['storage_root'],
+                self.files['local_compressed'])
+        safe_copy_file(self.files['local_compressed'],
+                self.files['storage_final'])
+        self.hold_for_processing()
 
     def on_enter_processing(self):
-        pass
+        '''Maintain processing state until scipion processing is complete.
+
+        Watch for the indicators that the entire scipion processing stack has
+        completed. Until then, recurse back to this state entrance. Once it has
+        completed, proceed to clean up.
+        '''
+        if self._is_processing_complete(self.files['local_stack']):
+            self.clean()
+        else:
+            self.async.add_timed_callback(on_enter_processing, 10)
 
     def on_enter_cleaning(self):
-        pass
+        raise NotImplementedError
 
     def on_enter_finished(self):
-        pass
+        raise NotImplementedError
 
 class AsyncWorkflowHelper():
     '''Processes async calls for the workflow
