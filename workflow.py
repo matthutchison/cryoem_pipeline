@@ -1,6 +1,6 @@
 from transitions import Machine
 from monitor import FilePatternMonitor
-from utilities import safe_copy_file
+from utilities import safe_copy_file, compress_file
 import asyncio
 import os
 import pathlib
@@ -101,6 +101,31 @@ class WorkflowItem():
         safe_copy_file(self.files['original'],
                 self.files['local_original'])
         
+    def on_enter_stacking(self):
+        '''Stack the files if the stack parameter evaluates True.
+        '''
+        #TODO: add stacking code
+        pass
+
+    def on_enter_compressing(self):
+        self.async.create_task(compress_file(self.files['local_stack']),
+            done_cb=_compressing_cb)
+
+    def _compressing_cb(self, fut):
+        if fut.done():
+            pass
+
+    def on_enter_exporting(self):
+        pass
+
+    def on_enter_processing(self):
+        pass
+
+    def on_enter_cleaning(self):
+        pass
+
+    def on_enter_finished(self):
+        pass
 
 class AsyncWorkflowHelper():
     '''Processes async calls for the workflow
@@ -111,8 +136,8 @@ class AsyncWorkflowHelper():
 
     def create_task(self, coro, done_cb=None):
         task = self.loop.create_task(coro)
-        if func:
-            coro.add_done_callback(done_cb)
+        if done_cb:
+            task.add_done_callback(done_cb)
 
     def add_timed_callback(self, func, sleep):
         self.loop.create_task(self._wrap_timed_callback(func, sleep))
