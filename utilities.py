@@ -21,9 +21,9 @@ async def compress_file(path):
     return await process.wait()
 
 
-async def stack_files(paths):
+async def stack_files(in_paths, out_path):
     '''Stack the files using imod. Return only after stacking complete.
     '''
-    cmd = ['newstack', *paths]
+    cmd = ['newstack', '-bytes 0', *in_paths, out_path]
     process = await asyncio.create_subprocess_exec(*cmd)
     return await process.wait()
