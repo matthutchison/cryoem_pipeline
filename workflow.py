@@ -1,6 +1,6 @@
 from transitions import Machine
 from monitor import FilePatternMonitor
-from utilities import safe_copy_file, compress_file
+from utilities import safe_copy_file, compress_file, stack_files
 import asyncio
 import os
 import pathlib
@@ -29,7 +29,7 @@ class Project():
         while True:
             items = await self.monitor
             for item in items:
-                model = WorkflowItem(item)
+                model = WorkflowItem(item, self.workflow, self.project)
                 self.workflow.add_model(model)
                 model.initialize()
             await asyncio.sleep(self.workflow.MIN_IMPORT_INTERVAL)
@@ -56,7 +56,8 @@ class Workflow(Machine):
                          auto_transitions=False)
         self.add_transition('initialize', source='initial', dest='creating')
         self.add_transition('import_file', source='creating', dest='importing')
-        self.add_transition('stack', source='importing', dest='stacking')
+        self.add_transition('stack', source=['importing', 'stacking'],
+                            dest='stacking')
         self.add_transition('compress', source=['importing', 'stacking'],
                             dest='compressing')
         self.add_transition('export', source='compressing', dest='exporting')
@@ -65,6 +66,11 @@ class Workflow(Machine):
         self.add_transition('clean', source=['processing', 'exporting'],
                             dest='cleaning')
         self.add_transition('finalize', source='cleaning', dest='finished')
+
+    def get_model(self, key):
+        models = [model for model in self.models
+                  if model.files['original'] == key]
+        return models[0]
 
 
 class WorkflowItem():
@@ -113,14 +119,52 @@ class WorkflowItem():
     def on_enter_stacking(self):
         '''Stack the files if the stack parameter evaluates True.
 
-        Cycle until all of the relevant files are copied local, then stack and
-        export a single time.
-        '''
+        If the file is an unstacked frame, check to see if there is a workflow
+        item for the stack created. If there's already a workflow item,
+        reference this file in that item's self.files['local_unstacked'].
 
-        # TODO: add stacking code
-        raise NotImplementedError
+        If the file is a stacked movie placeholder, call out and back until
+        all of the frames are referenced, then perform stacking. If that is
+        successful, trigger clean-up for each of the frames and move to
+        compressing.
+        '''
+        if self.project.frames == 1:
+            self.compress()
+            return
+        if ('local_unstacked' in self.files.keys() and
+                len(self.files['local_unstacked']) == self.project.frames):
+            self.async.create_task(stack_files(self.files['local_unstacked'],
+                                               self.files['original']),
+                                   done_cb=self._stacking_complete)
+        else:
+            stack_key = self.files['local_original'].name[:-2]
+            stack_path = self.files['local_original'].with_name(stack_key)
+            model = WorkflowItem(stack_path, self.workflow, self.project)
+            try:
+                model = self.workflow.get_model(stack_key)
+            except KeyError:
+                self.workflow.add_model(model, initial='stacking')
+            try:
+                model.files['local_unstacked'].append(self)
+            except KeyError:
+                model.files['local_unstacked'] = [self]
+            model.stack()
+
+    def _stacking_complete(self, fut):
+        if fut.result() == 0:
+            [x.clean() for x in self.files['local_unstacked']]
+            del self.files['local_unstacked']
+            self.compress()
+        else:
+            pass
 
     def on_enter_compressing(self):
+        '''Trigger compression of the local stack file.
+
+        The files are large, so compression is ideally multithreaded. The
+        compression function should call back when complete to trigger
+        the move to the next state.
+        '''
         self.async.create_task(compress_file(self.files['local_stack']),
                                done_cb=self._compressing_cb)
         self.files['local_compressed'] = self.files['local_stack'].with_suffix(
@@ -167,8 +211,7 @@ class AsyncWorkflowHelper():
 
     def create_task(self, coro, done_cb=None):
         task = self.loop.create_task(coro)
-        if done_cb:
-            task.add_done_callback(done_cb)
+        task.add_done_callback(done_cb) if done_cb else None
 
     def add_timed_callback(self, func, sleep):
         self.loop.create_task(self._wrap_timed_callback(func, sleep))
