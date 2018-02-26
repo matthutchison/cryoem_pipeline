@@ -1,21 +1,21 @@
-import asyncio
 import glob
 import time
 
+
 class FilePatternMonitor():
     """Async infinite generator for listing new files matching a pattern
-    
+
     Strictly monitors only the *addition* of files. Anything removed from the
         directory is not tracked. Anything removed and then re-added will be
         reported again.
 
     Keyword arguments:
     recursive -- as the "recursive" argument from glob.glob
-    walltime -- time in seconds that the directory may remain unchanged before the
-        monitor raises StopAsyncIteration and ends.
-    
+    walltime -- time in seconds that the directory may remain unchanged before
+        the monitor raises StopAsyncIteration and ends.
+
     Usage example:
-    
+
     loop = asyncio.get_event_loop()
     test = FilePatternMonitor('./*', walltime=25)
     async def tmp():
@@ -23,9 +23,9 @@ class FilePatternMonitor():
             print(await test)
             await asyncio.sleep(5)
     loop.run_until_complete(tmp())
-    
+
     """
-    
+
     def __init__(self, pattern, recursive=False, walltime=43200):
         self.pattern = pattern
         self.recursive = recursive

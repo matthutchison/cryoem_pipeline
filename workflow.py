@@ -2,11 +2,10 @@ from transitions import Machine
 from monitor import FilePatternMonitor
 from utilities import safe_copy_file, compress_file
 import asyncio
-import logging
 import os
 import pathlib
-import shutil
 import time
+
 
 class Project():
     '''Overarching project controller
@@ -35,6 +34,7 @@ class Project():
                 model.initialize()
             await asyncio.sleep(self.workflow.MIN_IMPORT_INTERVAL)
 
+
 class Workflow(Machine):
     '''The workflow state machine.
     '''
@@ -42,29 +42,30 @@ class Workflow(Machine):
 
     def __init__(self):
         states = ['initial',
-                'creating',
-                'importing',
-                'stacking',
-                'compressing',
-                'exporting',
-                'processing',
-                'cleaning',
-                'finished']
+                  'creating',
+                  'importing',
+                  'stacking',
+                  'compressing',
+                  'exporting',
+                  'processing',
+                  'cleaning',
+                  'finished']
         Machine.__init__(self,
-                states=states,
-                initial='initial',
-                auto_transitions=False)
+                         states=states,
+                         initial='initial',
+                         auto_transitions=False)
         self.add_transition('initialize', source='initial', dest='creating')
         self.add_transition('import_file', source='creating', dest='importing')
         self.add_transition('stack', source='importing', dest='stacking')
         self.add_transition('compress', source=['importing', 'stacking'],
-                dest='compressing')
+                            dest='compressing')
         self.add_transition('export', source='compressing', dest='exporting')
         self.add_transition('hold_for_processing', source='exporting',
-                dest='processing')
+                            dest='processing')
         self.add_transition('clean', source=['processing', 'exporting'],
-                dest='cleaning')
+                            dest='cleaning')
         self.add_transition('finalize', source='cleaning', dest='finished')
+
 
 class WorkflowItem():
     '''A file that will join and proceed through the workflow.
@@ -88,12 +89,12 @@ class WorkflowItem():
         '''Check that the file has finished creation, then transition state
 
         Since we're using network file systems here, we're using a simple check
-        to see if the file has been modified recently instead of something 
+        to see if the file has been modified recently instead of something
         fancier like inotify.
         '''
-        dt = _delta_mtime(self.path)
+        dt = self._delta_mtime(self.path)
         self.import_file() if dt > 15 else self.async.add_timed_callback(
-                on_enter_creating, 16 - dt)
+                self.on_enter_creating, 16 - dt)
 
     def on_enter_importing(self):
         '''Copy (import) the file to local storage for processing.
@@ -102,13 +103,13 @@ class WorkflowItem():
                 self.project.paths['local_root'],
                 self.files['original'].name)
         safe_copy_file(self.files['original'],
-                self.files['local_original'])
+                       self.files['local_original'])
         if self.project.frames > 1:
             self.stack()
         else:
             self.files['local_stack'] = self.files['local_original']
             self.compress()
-        
+
     def on_enter_stacking(self):
         '''Stack the files if the stack parameter evaluates True.
 
@@ -116,12 +117,12 @@ class WorkflowItem():
         export a single time.
         '''
 
-        #TODO: add stacking code
+        # TODO: add stacking code
         raise NotImplementedError
 
     def on_enter_compressing(self):
         self.async.create_task(compress_file(self.files['local_stack']),
-            done_cb=_compressing_cb)
+                               done_cb=self._compressing_cb)
         self.files['local_compressed'] = self.files['local_stack'].with_suffix(
                 self.files['local_stack'].suffix + '.bz2')
 
@@ -135,7 +136,7 @@ class WorkflowItem():
                 self.project.paths['storage_root'],
                 self.files['local_compressed'])
         safe_copy_file(self.files['local_compressed'],
-                self.files['storage_final'])
+                       self.files['storage_final'])
         self.hold_for_processing()
 
     def on_enter_processing(self):
@@ -148,13 +149,14 @@ class WorkflowItem():
         if self._is_processing_complete(self.files['local_stack']):
             self.clean()
         else:
-            self.async.add_timed_callback(on_enter_processing, 10)
+            self.async.add_timed_callback(self.on_enter_processing, 10)
 
     def on_enter_cleaning(self):
         raise NotImplementedError
 
     def on_enter_finished(self):
         raise NotImplementedError
+
 
 class AsyncWorkflowHelper():
     '''Processes async calls for the workflow
@@ -170,7 +172,7 @@ class AsyncWorkflowHelper():
 
     def add_timed_callback(self, func, sleep):
         self.loop.create_task(self._wrap_timed_callback(func, sleep))
-    
+
     async def _wrap_timed_callback(self, func, sleep):
         await asyncio.sleep(sleep)
         func()
