@@ -1,6 +1,7 @@
 from transitions import Machine
 from workflow.monitor import FilePatternMonitor
-from workflow.utilities import safe_copy_file, compress_file, stack_files
+from workflow.utilities import (safe_copy_file, hash_file, compress_file,
+                                uncompress_file, stack_files)
 import asyncio
 import os
 import pathlib
@@ -32,7 +33,7 @@ class Project():
                 model = WorkflowItem(item, self.workflow, self.project)
                 self.workflow.add_model(model)
                 model.initialize()
-            await asyncio.sleep(self.workflow.MIN_IMPORT_INTERVAL)
+                await asyncio.sleep(self.workflow.MIN_IMPORT_INTERVAL)
 
 
 class Workflow(Machine):
@@ -48,6 +49,7 @@ class Workflow(Machine):
                   'compressing',
                   'exporting',
                   'processing',
+                  'confirming',
                   'cleaning',
                   'finished']
         Machine.__init__(self,
@@ -63,7 +65,9 @@ class Workflow(Machine):
         self.add_transition('export', source='compressing', dest='exporting')
         self.add_transition('hold_for_processing', source='exporting',
                             dest='processing')
-        self.add_transition('clean', source=['processing', 'exporting'],
+        self.add_transition('confirm', source=['processing', 'exporting'],
+                            dest='confirming')
+        self.add_transition('clean', source=['confirming'],
                             dest='cleaning')
         self.add_transition('finalize', source='cleaning', dest='finished')
 
@@ -141,7 +145,7 @@ class WorkflowItem():
             stack_path = self.files['local_original'].with_name(stack_key)
             model = WorkflowItem(stack_path, self.workflow, self.project)
             try:
-                model = self.workflow.get_model(stack_key)
+                model = self.workflow.get_model(stack_path)
             except KeyError:
                 self.workflow.add_model(model, initial='stacking')
             try:
@@ -165,10 +169,11 @@ class WorkflowItem():
         compression function should call back when complete to trigger
         the move to the next state.
         '''
-        self.async.create_task(compress_file(self.files['local_stack']),
-                               done_cb=self._compressing_cb)
+        self.async.create_task(
+            compress_file(self.files['local_stack']),
+            done_cb=self._compressing_cb)
         self.files['local_compressed'] = self.files['local_stack'].with_suffix(
-                self.files['local_stack'].suffix + '.bz2')
+            self.files['local_stack'].suffix + '.bz2')
 
     def _compressing_cb(self, fut):
         self.export() if not fut.exception() else self.compress()
@@ -177,10 +182,11 @@ class WorkflowItem():
         '''Export (copy) the compressed file to the storage location
         '''
         self.files['storage_final'] = pathlib.Path(
-                self.project.paths['storage_root'],
-                self.files['local_compressed'])
-        safe_copy_file(self.files['local_compressed'],
-                       self.files['storage_final'])
+            self.project.paths['storage_root'],
+            self.files['local_compressed'])
+        safe_copy_file(
+            self.files['local_compressed'],
+            self.files['storage_final'])
         self.hold_for_processing()
 
     def on_enter_processing(self):
@@ -191,15 +197,53 @@ class WorkflowItem():
         completed, proceed to clean up.
         '''
         if self._is_processing_complete(self.files['local_stack']):
-            self.clean()
+            self.confirm()
         else:
             self.async.add_timed_callback(self.on_enter_processing, 10)
 
+    def on_enter_confirming(self):
+        '''Verify compression and that storage transfer is complete
+
+        Confirm that:
+        - The compression cycle is correct (hash original and re-uncompressed)
+        - The transfer to moab is complete
+        '''
+        new_name = self.files['local_original'].with_suffix('.orig')
+        self.files['local_uncompressed'] = self.files['local_original']
+        self.files['local_original'].rename(new_name)
+        self.files['local_original'] = pathlib.Path(new_name)
+        self.async.create_task(
+            uncompress_file(self.files['local_original'], force=True),
+            self._uncompress_complete)
+
+    def _uncompress_complete(self, fut):
+        hash_match = (hash_file(self.files['local_original']) ==
+                      hash_file(self.files['local_uncompressed']))
+        size_match = (os.stat(self.files['local_compressed']).st_size ==
+                      os.stat(self.files['storage_final']).st_size)
+        if hash_match and size_match:
+            self._confirm_complete()
+        else:
+            pass
+
+    def _confirm_complete(self, fut):
+        self.clean()
+
     def on_enter_cleaning(self):
-        raise NotImplementedError
+        self._remove_file(self.files['local_stack'])
+        self._remove_file(self.files['local_compressed'])
+        self._remove_file(self.files['local_uncompressed'])
+        self._remove_file(self.files['original'])
+        self.finalize()
+
+    def _remove_file(self, path):
+        try:
+            os.remove(str(path))
+        except OSError:
+            pass
 
     def on_enter_finished(self):
-        raise NotImplementedError
+        pass
 
 
 class AsyncWorkflowHelper():
