@@ -1,6 +1,6 @@
 from transitions import Machine
-from monitor import FilePatternMonitor
-from utilities import safe_copy_file, compress_file, stack_files
+from workflow.monitor import FilePatternMonitor
+from workflow.utilities import safe_copy_file, compress_file, stack_files
 import asyncio
 import os
 import pathlib

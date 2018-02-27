@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from workflow import Project
+from workflow.workflow import Project
 import argparse
 import sys
 
