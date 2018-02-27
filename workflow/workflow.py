@@ -30,7 +30,7 @@ class Project():
         while True:
             items = await self.monitor
             for item in items:
-                model = WorkflowItem(item, self.workflow, self.project)
+                model = WorkflowItem(item, self.workflow, self)
                 self.workflow.add_model(model)
                 model.initialize()
                 await asyncio.sleep(self.workflow.MIN_IMPORT_INTERVAL)
@@ -93,7 +93,15 @@ class WorkflowItem():
         return int(time.time()) - os.stat(path).st_mtime
 
     def _is_processing_complete(self, path):
-        raise NotImplementedError
+        web_project_index = pathlib.Path(
+            '/var/www/scipion/',
+            self.project.project,
+            'index.html')
+        with open(web_project_index, mode='r', encoding='utf8') as index:
+            if str(self.files['original'].stem) in index.read():
+                return True
+            else:
+                return False
 
     def on_enter_creating(self):
         '''Check that the file has finished creation, then transition state
