@@ -16,7 +16,16 @@ def _check_python_version_compatible():
 
 def _check_imod_installed():
     from shutil import which
-    return which('imod') is not None
+    if which('imod') is None:
+        print('This application requires imod be installed. Exiting')
+        sys.exit(1)
+
+
+def _check_scipion_installed():
+    from shutil import which
+    if which('scipion') is None:
+        print('This application requires scipion be installed. Exiting')
+        sys.exit(1)
 
 
 def _parse_arguments():
@@ -42,8 +51,10 @@ def _parse_arguments():
 if __name__ == '__main__':
     args = _parse_arguments()
     _check_python_version_compatible()
+    _check_scipion_installed()
+    _check_imod_installed()
     project = Project(project=args.project,
                       pattern=args.pattern,
-                      frames=args.frames
+                      frames=args.frames or 1
                       )
     project.start()
