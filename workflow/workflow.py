@@ -1,6 +1,6 @@
 from transitions import Machine
 from workflow.monitor import FilePatternMonitor
-from workflow.utilities import (safe_copy_file, hash_file, compress_file,
+from workflow.utilities import (safe_copy_file, file_hash, compress_file,
                                 uncompress_file, stack_files)
 import asyncio
 import os
@@ -34,6 +34,17 @@ class Project():
                 self.workflow.add_model(model)
                 model.initialize()
                 await asyncio.sleep(self.workflow.MIN_IMPORT_INTERVAL)
+
+    def _ensure_root_directories(self):
+        self._ensure_directory(self.paths['local_root'])
+        self._ensure_directory(self.paths['storage_root'])
+
+    @staticmethod
+    def _ensure_directory(path):
+        try:
+            os.stat(str(path))
+        except FileNotFoundError:
+            os.makedirs(str(path, exist_ok=True))
 
 
 class Workflow(Machine):
@@ -86,18 +97,19 @@ class WorkflowItem():
         self.files = {'original': pathlib.Path(path)}
         self.project = project
         self.workflow = workflow
+        self.async = project.async
 
     def _delta_mtime(self, path):
         '''Return the difference between system time and file modified timestamp
         '''
-        return int(time.time()) - os.stat(path).st_mtime
+        return int(time.time()) - os.stat(str(path)).st_mtime
 
     def _is_processing_complete(self, path):
         web_project_index = pathlib.Path(
             '/var/www/scipion/',
             self.project.project,
             'index.html')
-        with open(web_project_index, mode='r', encoding='utf8') as index:
+        with open(str(web_project_index), mode='r', encoding='utf8') as index:
             if str(self.files['original'].stem) in index.read():
                 return True
             else:
@@ -110,7 +122,7 @@ class WorkflowItem():
         to see if the file has been modified recently instead of something
         fancier like inotify.
         '''
-        dt = self._delta_mtime(self.path)
+        dt = self._delta_mtime(self.files['original'])
         self.import_file() if dt > 15 else self.async.add_timed_callback(
                 self.on_enter_creating, 16 - dt)
 
@@ -178,7 +190,7 @@ class WorkflowItem():
         the move to the next state.
         '''
         self.async.create_task(
-            compress_file(self.files['local_stack']),
+            compress_file(self.files['local_stack'], force=True),
             done_cb=self._compressing_cb)
         self.files['local_compressed'] = self.files['local_stack'].with_suffix(
             self.files['local_stack'].suffix + '.bz2')
@@ -191,7 +203,7 @@ class WorkflowItem():
         '''
         self.files['storage_final'] = pathlib.Path(
             self.project.paths['storage_root'],
-            self.files['local_compressed'])
+            self.files['local_compressed'].name)
         safe_copy_file(
             self.files['local_compressed'],
             self.files['storage_final'])
@@ -221,14 +233,14 @@ class WorkflowItem():
         self.files['local_original'].rename(new_name)
         self.files['local_original'] = pathlib.Path(new_name)
         self.async.create_task(
-            uncompress_file(self.files['local_original'], force=True),
+            uncompress_file(self.files['local_compressed'], force=True),
             self._uncompress_complete)
 
     def _uncompress_complete(self, fut):
-        hash_match = (hash_file(self.files['local_original']) ==
-                      hash_file(self.files['local_uncompressed']))
-        size_match = (os.stat(self.files['local_compressed']).st_size ==
-                      os.stat(self.files['storage_final']).st_size)
+        hash_match = (file_hash(self.files['local_original']) ==
+                      file_hash(self.files['local_uncompressed']))
+        size_match = (os.stat(str(self.files['local_compressed'])).st_size ==
+                      os.stat(str(self.files['storage_final'])).st_size)
         if hash_match and size_match:
             self._confirm_complete()
         else:
@@ -241,6 +253,7 @@ class WorkflowItem():
         self._remove_file(self.files['local_stack'])
         self._remove_file(self.files['local_compressed'])
         self._remove_file(self.files['local_uncompressed'])
+        self._remove_file(self.files['local_original'])
         self._remove_file(self.files['original'])
         self.finalize()
 
