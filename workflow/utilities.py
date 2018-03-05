@@ -1,10 +1,12 @@
 import asyncio
 import hashlib
-import shutil
 
 
-def safe_copy_file(src, dest):
-    shutil.copy2(str(src), str(dest))
+async def safe_copy_file(src, dest):
+    '''Copy the file from source to dest.
+    '''
+    cmd = ['cp', str(src), str(dest)]
+    return _create_process_from_cmd(cmd)
 
 
 def file_hash(path):
@@ -22,8 +24,7 @@ async def compress_file(path, force=False):
     '''
     cmd = ['lbzip2', '-k', '-n 8', '-z', str(path)]
     cmd.insert(1, '-f') if force else None
-    process = await asyncio.create_subprocess_exec(*cmd)
-    return await process.wait()
+    return _create_process_from_cmd(cmd)
 
 
 async def uncompress_file(path, force=False):
@@ -33,13 +34,16 @@ async def uncompress_file(path, force=False):
     '''
     cmd = ['lbzip2', '-k', '-n 4', '-d', str(path)]
     cmd.insert(1, '-f') if force else None
-    process = await asyncio.create_subprocess_exec(*cmd)
-    return await process.wait()
+    return _create_process_from_cmd(cmd)
 
 
 async def stack_files(in_paths, out_path):
     '''Stack the files using imod. Return only after stacking complete.
     '''
     cmd = ['newstack', '-bytes 0', *[str(p) for p in in_paths], str(out_path)]
+    return _create_process_from_cmd(cmd)
+
+
+async def _create_process_from_cmd(cmd):
     process = await asyncio.create_subprocess_exec(*cmd)
     return await process.wait()

@@ -134,13 +134,18 @@ class WorkflowItem():
         self.files['local_original'] = pathlib.Path(
                 self.project.paths['local_root'],
                 self.files['original'].name)
-        safe_copy_file(self.files['original'],
-                       self.files['local_original'])
-        if self.project.frames > 1:
-            self.stack()
-        else:
-            self.files['local_stack'] = self.files['local_original']
-            self.compress()
+        self.async.create_task(
+            safe_copy_file(self.files['original'],
+                           self.files['local_original']),
+            self._importing_complete)
+
+    def _importing_complete(self, fut):
+        if fut.result() == 0:
+            if self.project.frames > 1:
+                self.stack()
+            else:
+                self.files['local_stack'] = self.files['local_original']
+                self.compress()
 
     def on_enter_stacking(self):
         '''Stack the files if the stack parameter evaluates True.
@@ -193,11 +198,11 @@ class WorkflowItem():
         '''
         self.async.create_task(
             compress_file(self.files['local_stack'], force=True),
-            done_cb=self._compressing_cb)
+            done_cb=self._compressing_complete)
         self.files['local_compressed'] = self.files['local_stack'].with_suffix(
             self.files['local_stack'].suffix + '.bz2')
 
-    def _compressing_cb(self, fut):
+    def _compressing_complete(self, fut):
         self.export() if not fut.exception() else self.compress()
 
     def on_enter_exporting(self):
@@ -206,10 +211,17 @@ class WorkflowItem():
         self.files['storage_final'] = pathlib.Path(
             self.project.paths['storage_root'],
             self.files['local_compressed'].name)
-        safe_copy_file(
-            self.files['local_compressed'],
-            self.files['storage_final'])
-        self.hold_for_processing()
+        self.async.create_task(
+            safe_copy_file(
+                self.files['local_compressed'],
+                self.files['storage_final']),
+            self._exporting_complete)
+
+    def _exporting_complete(self, fut):
+        if fut.result() == 0:
+            self.hold_for_processing()
+        else:
+            pass
 
     def on_enter_processing(self):
         '''Maintain processing state until scipion processing is complete.
