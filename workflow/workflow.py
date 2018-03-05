@@ -35,6 +35,7 @@ class Project():
                 self.workflow.add_model(model)
                 model.initialize()
                 await asyncio.sleep(self.workflow.MIN_IMPORT_INTERVAL)
+            await asyncio.sleep(2)
 
     def _ensure_root_directories(self):
         self._ensure_directory(self.paths['local_root'])
