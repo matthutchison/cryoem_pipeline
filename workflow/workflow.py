@@ -21,6 +21,7 @@ class Project():
                 'local_root': '/tmp/' + str(project),
                 'storage_root': '/mnt/moab/' + str(project)
                 }
+        self._ensure_root_directories()
         self.frames = frames
 
     def start(self):
@@ -44,7 +45,7 @@ class Project():
         try:
             os.stat(str(path))
         except FileNotFoundError:
-            os.makedirs(str(path, exist_ok=True))
+            os.makedirs(str(path), exist_ok=True)
 
 
 class Workflow(Machine):
@@ -242,7 +243,7 @@ class WorkflowItem():
         size_match = (os.stat(str(self.files['local_compressed'])).st_size ==
                       os.stat(str(self.files['storage_final'])).st_size)
         if hash_match and size_match:
-            self._confirm_complete()
+            self._confirm_complete(fut)
         else:
             pass
 
