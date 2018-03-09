@@ -1,20 +1,29 @@
 import asyncio
-import hashlib
 
 
 async def safe_copy_file(src, dest):
     '''Copy the file from source to dest.
     '''
     cmd = ['cp', str(src), str(dest)]
-    return _create_process_from_cmd(cmd)
+    return _wait_subprocess_exec(cmd)
 
 
-def file_hash(path):
-    h = hashlib.sha1()
-    with open(str(path), 'rb', buffering=0) as f:
-        for b in iter(lambda: f.read(128*1024), b''):
-            h.update(b)
-    return h.hexdigest()
+async def file_hash(path):
+    '''Get the sha1 hash of the given file.
+    '''
+    cmd = ['shasum', str(path)]
+    return _communicate_subprocess_exec(cmd)
+
+
+async def compare_hashes(path_a, path_b):
+    '''Compare the hashes of two files
+    '''
+    a = await file_hash(path_a)
+    b = await file_hash(path_b)
+    if a[0] and b[0]:
+        return a[0].split()[0] == b[0].split()[0]
+    else:
+        raise FileNotFoundError
 
 
 async def compress_file(path, force=False):
@@ -24,7 +33,7 @@ async def compress_file(path, force=False):
     '''
     cmd = ['lbzip2', '-k', '-n 8', '-z', str(path)]
     cmd.insert(1, '-f') if force else None
-    return _create_process_from_cmd(cmd)
+    return _wait_subprocess_exec(cmd)
 
 
 async def uncompress_file(path, force=False):
@@ -34,16 +43,24 @@ async def uncompress_file(path, force=False):
     '''
     cmd = ['lbzip2', '-k', '-n 4', '-d', str(path)]
     cmd.insert(1, '-f') if force else None
-    return _create_process_from_cmd(cmd)
+    return _wait_subprocess_exec(cmd)
 
 
 async def stack_files(in_paths, out_path):
     '''Stack the files using imod. Return only after stacking complete.
     '''
     cmd = ['newstack', '-bytes 0', *[str(p) for p in in_paths], str(out_path)]
-    return _create_process_from_cmd(cmd)
+    return _wait_subprocess_exec(cmd)
 
 
-async def _create_process_from_cmd(cmd):
+async def _wait_subprocess_exec(cmd):
     process = await asyncio.create_subprocess_exec(*cmd)
     return await process.wait()
+
+
+async def _communicate_subprocess_exec(cmd):
+    process = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE)
+    return await process.communicate(None)

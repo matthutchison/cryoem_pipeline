@@ -1,6 +1,6 @@
 from transitions import Machine
 from workflow.monitor import FilePatternMonitor
-from workflow.utilities import (safe_copy_file, file_hash, compress_file,
+from workflow.utilities import (safe_copy_file, compare_hashes, compress_file,
                                 uncompress_file, stack_files)
 import asyncio
 import os
@@ -107,15 +107,18 @@ class WorkflowItem():
         return int(time.time()) - os.stat(str(path)).st_mtime
 
     def _is_processing_complete(self, path):
-        web_project_index = pathlib.Path(
+        project_index = pathlib.Path(
             '/var/www/scipion/',
             self.project.project,
             'index.html')
-        with open(str(web_project_index), mode='r', encoding='utf8') as index:
-            if str(self.files['original'].stem) in index.read():
-                return True
-            else:
-                return False
+        try:
+            with open(str(project_index), mode='r', encoding='utf8') as index:
+                if str(self.files['original'].stem) in index.read():
+                    return True
+                else:
+                    return False
+        except FileNotFoundError:
+            return False
 
     def on_enter_creating(self):
         '''Check that the file has finished creation, then transition state
@@ -140,12 +143,16 @@ class WorkflowItem():
             self._importing_complete)
 
     def _importing_complete(self, fut):
-        if fut.result() == 0:
+        if fut.exception():
+            self.on_enter_importing()
+        elif fut.result() == 0:
             if self.project.frames > 1:
                 self.stack()
             else:
                 self.files['local_stack'] = self.files['local_original']
                 self.compress()
+        else:
+            pass
 
     def on_enter_stacking(self):
         '''Stack the files if the stack parameter evaluates True.
@@ -218,7 +225,9 @@ class WorkflowItem():
             self._exporting_complete)
 
     def _exporting_complete(self, fut):
-        if fut.result() == 0:
+        if fut.exception():
+            self.on_enter_exporting()
+        elif fut.result() == 0:
             self.hold_for_processing()
         else:
             pass
@@ -251,11 +260,22 @@ class WorkflowItem():
             self._uncompress_complete)
 
     def _uncompress_complete(self, fut):
-        hash_match = (file_hash(self.files['local_original']) ==
-                      file_hash(self.files['local_uncompressed']))
         size_match = (os.stat(str(self.files['local_compressed'])).st_size ==
                       os.stat(str(self.files['storage_final'])).st_size)
-        if hash_match and size_match:
+        if size_match:
+            self.async.create_task(
+                compare_hashes(
+                    self.files['local_original'],
+                    self.files['local_uncompressed']),
+                self._hashes_complete)
+        else:
+            pass
+
+    def _hashes_complete(self, fut):
+        if fut.exception():
+            self.async.add_timed_callback(
+                self._uncompress_complete, 10)
+        elif fut.result() is True:
             self._confirm_complete(fut)
         else:
             pass
