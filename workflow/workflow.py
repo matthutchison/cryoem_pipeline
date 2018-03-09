@@ -19,7 +19,7 @@ class Project():
         self.monitor = FilePatternMonitor(pattern)
         self.paths = {
                 'local_root': '/tmp/' + str(project),
-                'storage_root': '/mnt/moab/' + str(project)
+                'storage_root': '/mnt/nas/' + str(project)
                 }
         self._ensure_root_directories()
         self.frames = frames
