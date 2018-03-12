@@ -5,14 +5,14 @@ async def safe_copy_file(src, dest):
     '''Copy the file from source to dest.
     '''
     cmd = ['cp', str(src), str(dest)]
-    return _wait_subprocess_exec(cmd)
+    return await _wait_subprocess_exec(cmd)
 
 
 async def file_hash(path):
     '''Get the sha1 hash of the given file.
     '''
     cmd = ['shasum', str(path)]
-    return _communicate_subprocess_exec(cmd)
+    return await _communicate_subprocess_exec(cmd)
 
 
 async def compare_hashes(path_a, path_b):
@@ -33,7 +33,7 @@ async def compress_file(path, force=False):
     '''
     cmd = ['lbzip2', '-k', '-n 8', '-z', str(path)]
     cmd.insert(1, '-f') if force else None
-    return _wait_subprocess_exec(cmd)
+    return await _wait_subprocess_exec(cmd)
 
 
 async def uncompress_file(path, force=False):
@@ -43,14 +43,14 @@ async def uncompress_file(path, force=False):
     '''
     cmd = ['lbzip2', '-k', '-n 4', '-d', str(path)]
     cmd.insert(1, '-f') if force else None
-    return _wait_subprocess_exec(cmd)
+    return await _wait_subprocess_exec(cmd)
 
 
 async def stack_files(in_paths, out_path):
     '''Stack the files using imod. Return only after stacking complete.
     '''
     cmd = ['newstack', '-bytes 0', *[str(p) for p in in_paths], str(out_path)]
-    return _wait_subprocess_exec(cmd)
+    return await _wait_subprocess_exec(cmd)
 
 
 async def _wait_subprocess_exec(cmd):
