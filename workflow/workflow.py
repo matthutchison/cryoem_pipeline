@@ -28,14 +28,18 @@ class Project():
         self.async.loop.run_until_complete(self._async_start())
 
     async def _async_start(self):
-        while True:
-            items = await self.monitor
-            for item in items:
-                model = WorkflowItem(item, self.workflow, self)
-                self.workflow.add_model(model)
-                model.initialize()
-                await asyncio.sleep(self.workflow.MIN_IMPORT_INTERVAL)
-            await asyncio.sleep(2)
+        try:
+            while True:
+                items = await self.monitor
+                for item in items:
+                    model = WorkflowItem(item, self.workflow, self)
+                    self.workflow.add_model(model)
+                    model.initialize()
+                    await asyncio.sleep(self.workflow.MIN_IMPORT_INTERVAL)
+                await asyncio.sleep(2)
+        except StopAsyncIteration:
+            import sys
+            sys.exit(0)
 
     def _ensure_root_directories(self):
         self._ensure_directory(self.paths['local_root'])

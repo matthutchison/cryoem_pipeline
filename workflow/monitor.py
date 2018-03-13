@@ -34,16 +34,10 @@ class FilePatternMonitor():
         self.base_time = time.time()
 
     def __await__(self):
-        return self._get_new_files().__await__()
-
-    async def __aiter__(self):
-        return self
-
-    async def __anext__(self):
         if self.base_time + self.walltime < time.time():
             raise StopAsyncIteration
         else:
-            return await self._get_new_files()
+            return self._get_new_files().__await__()
 
     async def _get_new_files(self):
         new = set(glob.glob(self.pattern, recursive=self.recursive))
