@@ -20,3 +20,7 @@ class MonitorTest(unittest.TestCase):
         fpm.base_time = time.time() - 10
         with self.assertRaises(StopAsyncIteration):
             self.loop.run_until_complete(self.next_monitor_result(fpm))
+
+    def test_await_before_walltime_doesnt_raise_StopAsyncIteration(self):
+        fpm = mon.FilePatternMonitor('./*', walltime=1)
+        self.loop.run_until_complete(self.next_monitor_result(fpm))

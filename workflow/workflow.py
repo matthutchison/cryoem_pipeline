@@ -91,7 +91,7 @@ class Workflow(Machine):
     def get_model(self, key):
         models = [model for model in self.models
                   if model.files['original'] == key]
-        return models[0]
+        return models[0] if models else None
 
 
 class WorkflowItem():
