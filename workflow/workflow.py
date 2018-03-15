@@ -56,7 +56,7 @@ class Project():
 class Workflow(Machine):
     '''The workflow state machine.
     '''
-    MIN_IMPORT_INTERVAL = 20
+    MIN_IMPORT_INTERVAL = 45
 
     def __init__(self):
         states = ['initial',
@@ -74,17 +74,26 @@ class Workflow(Machine):
                          initial='initial',
                          auto_transitions=False)
         self.add_transition('initialize', source='initial', dest='creating')
-        self.add_transition('import_file', source='creating', dest='importing')
-        self.add_transition('stack', source=['importing', 'stacking'],
+        self.add_transition('import_file',
+                            source=['creating', 'importing'],
+                            dest='importing')
+        self.add_transition('stack',
+                            source=['importing', 'stacking'],
                             dest='stacking')
-        self.add_transition('compress', source=['importing', 'stacking'],
+        self.add_transition('compress',
+                            source=['importing', 'stacking', 'compressing'],
                             dest='compressing')
-        self.add_transition('export', source='compressing', dest='exporting')
-        self.add_transition('hold_for_processing', source='exporting',
+        self.add_transition('export',
+                            source=['compressing', 'exporting'],
+                            dest=['exporting'])
+        self.add_transition('hold_for_processing',
+                            source=['exporting', 'processing'],
                             dest='processing')
-        self.add_transition('confirm', source=['processing', 'exporting'],
+        self.add_transition('confirm',
+                            source=['processing', 'exporting'],
                             dest='confirming')
-        self.add_transition('clean', source=['confirming'],
+        self.add_transition('clean',
+                            source=['confirming'],
                             dest='cleaning')
         self.add_transition('finalize', source='cleaning', dest='finished')
 
@@ -148,7 +157,7 @@ class WorkflowItem():
 
     def _importing_complete(self, fut):
         if fut.exception():
-            self.on_enter_importing()
+            self.add_timed_callback(self.import_file(), 10)
         elif fut.result() == 0:
             if self.project.frames > 1:
                 self.stack()
@@ -156,7 +165,7 @@ class WorkflowItem():
                 self.files['local_stack'] = self.files['local_original']
                 self.compress()
         else:
-            pass
+            self.add_timed_callback(self.import_file(), 10)
 
     def on_enter_stacking(self):
         '''Stack the files if the stack parameter evaluates True.
@@ -230,11 +239,11 @@ class WorkflowItem():
 
     def _exporting_complete(self, fut):
         if fut.exception():
-            self.on_enter_exporting()
+            self.add_timed_callback(self.export(), 10)
         elif fut.result() == 0:
             self.hold_for_processing()
         else:
-            pass
+            self.add_timed_callback(self.export(), 10)
 
     def on_enter_processing(self):
         '''Maintain processing state until scipion processing is complete.
@@ -246,7 +255,7 @@ class WorkflowItem():
         if self._is_processing_complete(self.files['local_stack']):
             self.confirm()
         else:
-            self.async.add_timed_callback(self.on_enter_processing, 10)
+            self.async.add_timed_callback(self.hold_for_processing(), 10)
 
     def on_enter_confirming(self):
         '''Verify compression and that storage transfer is complete
