@@ -85,7 +85,7 @@ class Workflow(Machine):
                             dest='compressing')
         self.add_transition('export',
                             source=['compressing', 'exporting'],
-                            dest=['exporting'])
+                            dest='exporting')
         self.add_transition('hold_for_processing',
                             source=['exporting', 'processing'],
                             dest='processing')
