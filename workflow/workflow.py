@@ -157,7 +157,7 @@ class WorkflowItem():
 
     def _importing_complete(self, fut):
         if fut.exception():
-            self.add_timed_callback(self.import_file(), 10)
+            self.async.add_timed_callback(self.import_file(), 10)
         elif fut.result() == 0:
             if self.project.frames > 1:
                 self.stack()
@@ -165,7 +165,7 @@ class WorkflowItem():
                 self.files['local_stack'] = self.files['local_original']
                 self.compress()
         else:
-            self.add_timed_callback(self.import_file(), 10)
+            self.async.add_timed_callback(self.import_file(), 10)
 
     def on_enter_stacking(self):
         '''Stack the files if the stack parameter evaluates True.
@@ -239,11 +239,11 @@ class WorkflowItem():
 
     def _exporting_complete(self, fut):
         if fut.exception():
-            self.add_timed_callback(self.export(), 10)
+            self.async.add_timed_callback(self.export(), 10)
         elif fut.result() == 0:
             self.hold_for_processing()
         else:
-            self.add_timed_callback(self.export(), 10)
+            self.async.add_timed_callback(self.export(), 10)
 
     def on_enter_processing(self):
         '''Maintain processing state until scipion processing is complete.
