@@ -53,6 +53,24 @@ async def stack_files(in_paths, out_path):
     return await _wait_subprocess_exec(cmd)
 
 
+async def globus_transfer(src_endpoint_spec, dest_endpoint_spec, *args):
+    '''Tranfer file via globus.
+
+    Tranfer file from the src_endpoint_spec to the dest_endpoint_spec using
+    the python globus cli (the "new" cli from 2017).
+
+    The endpoint spec should be of the form endpoint_uuid:path as in:
+        "00c368d6-8cb0-48cf-8896-f31426d5eab2:/path/to/file(s)"
+    
+    Additional arguments to the globus command can be passed via *args
+    Expansion will be handled as the *arg value, for example:
+        value = '-s mtime'
+        would expand in the subprocess creation as [..., '-s mtime', ...]
+    '''
+    cmd = ['globus', 'transfer', src_endpoint_spec, dest_endpoint_spec, *args]
+    return await _wait_subprocess_exec(cmd)
+    
+
 async def _wait_subprocess_exec(cmd):
     process = await asyncio.create_subprocess_exec(*cmd)
     return await process.wait()

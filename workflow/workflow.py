@@ -1,11 +1,14 @@
 from transitions import Machine
 from workflow.monitor import FilePatternMonitor
 from workflow.utilities import (safe_copy_file, compare_hashes, compress_file,
-                                uncompress_file, stack_files)
+                                uncompress_file, stack_files, globus_transfer)
 import asyncio
 import os
 import pathlib
 import time
+
+ATC_GLOBUS_ENDPOINT = '67dace28-311f-11e8-b8f8-0ac6873fc732'
+MOAB_GLOBUS_ENDPOINT = 'dabdccc3-6d04-11e5-ba46-22000b92c6ec'
 
 
 class Project():
@@ -19,13 +22,15 @@ class Project():
         self.monitor = FilePatternMonitor(pattern)
         self.paths = {
                 'local_root': '/tmp/' + str(project),
-                'storage_root': '/mnt/nas/' + str(project)
+                'storage_root': '/mnt/nas/' + str(project),
+                'globus_root': '/mnt/NCEF-CryoEM/' + str(project)
                 }
         self._ensure_root_directories()
         self.frames = frames
 
     def start(self):
         self.async.loop.run_until_complete(self._async_start())
+        self.async.add_timed_callback(self._schedule_transfer, 1800)
 
     async def _async_start(self):
         try:
@@ -40,6 +45,15 @@ class Project():
         except StopAsyncIteration:
             import sys
             sys.exit(0)
+
+    def _schedule_transfer(self):
+        globus_transfer(
+            ATC_GLOBUS_ENDPOINT + ':' + self.paths['storage_root'],
+            MOAB_GLOBUS_ENDPOINT + ':' + self.paths['globus_root'],
+            '-s mtime',
+            '-r',
+            '--preserve-mtime',
+            '--notify failed,inactive')
 
     def _ensure_root_directories(self):
         self._ensure_directory(self.paths['local_root'])
