@@ -29,8 +29,8 @@ class Project():
         self.frames = frames
 
     def start(self):
+        self._schedule_transfers()
         self.async.loop.run_until_complete(self._async_start())
-        self.async.add_timed_callback(self._schedule_transfer, 1800)
 
     async def _async_start(self):
         try:
@@ -46,8 +46,20 @@ class Project():
             import sys
             sys.exit(0)
 
-    def _schedule_transfer(self):
-        globus_transfer(
+    def _transfer_loop(self):
+        self.async.create_task(
+            self._schedule_globus_transfer(),
+            done_cb=self._transfer_loop
+        )
+
+    async def _schedule_globus_transfer(self, pre_wait=1800):
+        '''Schedule the globus transfer for synchronization after a wait time
+
+        Default pre_wait (seconds) is 1800. Decrease to 0 for one-offs or if
+        you're handling an inter-call interval yourself.
+        '''
+        await asyncio.sleep(pre_wait)
+        await globus_transfer(
             ATC_GLOBUS_ENDPOINT + ':' + self.paths['storage_root'],
             MOAB_GLOBUS_ENDPOINT + ':' + self.paths['globus_root'],
             '-s mtime',
