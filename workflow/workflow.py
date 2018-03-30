@@ -29,7 +29,7 @@ class Project():
         self.frames = frames
 
     def start(self):
-        self._schedule_transfers()
+        self._transfer_loop()
         self.async.loop.run_until_complete(self._async_start())
 
     async def _async_start(self):
