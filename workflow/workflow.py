@@ -46,7 +46,7 @@ class Project():
             import sys
             sys.exit(0)
 
-    def _transfer_loop(self):
+    def _transfer_loop(self, fut=None):
         self.async.create_task(
             self._schedule_globus_transfer(),
             done_cb=self._transfer_loop
