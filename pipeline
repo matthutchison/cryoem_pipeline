@@ -42,15 +42,27 @@ def _parse_arguments():
                         required=False,
                         type=int,
                         help='Set to the number of frames that will need to be\
-                        stacked per-movie. Defaults to 1 (already stacked)')
+                        stacked per-movie. Defaults to 1 (already stacked).')
+    parser.add_argument('-v', '--debug', '--verbosity',
+                        required=False,
+                        type=str,
+                        help='Provide a verbosity level like INFO or DEBUG\
+                        Defaults to the equivalent of --debug WARNING')
+    parser.add_argument('--log-file', '-o',
+                        required=False,
+                        type=str,
+                        help='Path to write log file.')
     args = parser.parse_args()
     return args
 
 
 if __name__ == '__main__':
-    args = _parse_arguments()
-    logging.basicConfig(level=logging.INFO)
     _check_python_version_compatible()
+    args = _parse_arguments()
+    logging.basicConfig(
+        level=getattr(logging, args.debug) if args.debug else logging.WARNING,
+        filename=None or args.log_file)
+    logging.getLogger('transitions').setLevel(logging.WARNING)
     _check_scipion_installed()
     _check_imod_installed()
     project = Project(project=args.project,

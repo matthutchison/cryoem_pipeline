@@ -3,12 +3,14 @@ from workflow.monitor import FilePatternMonitor
 from workflow.utilities import (safe_copy_file, compare_hashes, compress_file,
                                 uncompress_file, stack_files, globus_transfer)
 import asyncio
+import logging
 import os
 import pathlib
 import time
 
 ATC_GLOBUS_ENDPOINT = '67dace28-311f-11e8-b8f8-0ac6873fc732'
 MOAB_GLOBUS_ENDPOINT = 'dabdccc3-6d04-11e5-ba46-22000b92c6ec'
+logger = logging.getLogger(__name__)
 
 
 class Project():
@@ -58,14 +60,17 @@ class Project():
         Default pre_wait (seconds) is 1800. Decrease to 0 for one-offs or if
         you're handling an inter-call interval yourself.
         '''
+        if not self.project:
+            raise KeyError('Project name must not be empty.')
         await asyncio.sleep(pre_wait)
         await globus_transfer(
-            ATC_GLOBUS_ENDPOINT + ':' + self.paths['storage_root'],
+            ATC_GLOBUS_ENDPOINT + ':' + str(self.project),
             MOAB_GLOBUS_ENDPOINT + ':' + self.paths['globus_root'],
-            '-s mtime',
+            '-s', 'mtime',
             '-r',
             '--preserve-mtime',
-            '--notify failed,inactive')
+            '--notify', 'failed,inactive',
+            '--label', str(self.project))
 
     def _ensure_root_directories(self):
         self._ensure_directory(self.paths['local_root'])
@@ -139,6 +144,7 @@ class WorkflowItem():
         self.project = project
         self.workflow = workflow
         self.async = project.async
+        logger.info('Starting: {0}'.format(self.files['original']))
 
     def _delta_mtime(self, path):
         '''Return the difference between system time and file modified timestamp
@@ -314,6 +320,7 @@ class WorkflowItem():
         if fut.exception():
             self.async.add_timed_callback(
                 self._uncompress_complete, 10)
+            logger.warning(fut.exception())
         elif fut.result() is True:
             self._confirm_complete(fut)
         else:
@@ -337,7 +344,7 @@ class WorkflowItem():
             pass
 
     def on_enter_finished(self):
-        pass
+        logger.info('Finalized: {0}'.format(self.files['original']))
 
 
 class AsyncWorkflowHelper():
