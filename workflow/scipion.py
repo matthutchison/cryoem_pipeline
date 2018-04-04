@@ -8,25 +8,26 @@ class Config():
     '''Container for project configuration values
     '''
 
-    def __init__(self):
-        self.project_name = None
-        self.src_pattern = None
-        self.path_to_gainref = None
-        self.frames_to_stack = None
-        self.physical_pixel_size = None
-        self.image_pixel_size = None
-        self.super_resolution = None
-        self.ctf_low_res = None
-        self.ctf_high_res = None
-        self.defocus_search_min = None
-        self.defocus_search_min = None
-        self.output_path = None
+    def __init__(self, **kwargs):
+        self.project_name = kwargs.get('project')
+        self.source_pattern = kwargs.get('src_pattern')
+        self.working_directory = kwargs.get('working_directory')
+        self.path_to_gainref = kwargs.get('path_to_gainref')
+        self.frames_to_stack = kwargs.get('frames')
+        self.physical_pixel_size = kwargs.get('physical_pixel')
+        self.image_pixel_size = kwargs.get('image_pixel')
+        self.super_resolution = kwargs.get('super_resolution')
+        self.ctf_low_res = kwargs.get('ctf_low_res')
+        self.ctf_high_res = kwargs.get('ctf_high_res')
+        self.defocus_search_min = kwargs.get('defocus_min')
+        self.defocus_search_max = kwargs.get('defocus_max')
+        self.scipion_config_path = kwargs.get('scipion_output')
 
     def generate_config(self):
         self.get_config_values()
         self.load_template('workflow/workflow_template.json')
         self.template_insert_values()
-        self.write_template(self.output_path)
+        self.write_template(self.scipion_config_path)
 
     def load_template(self, template_path):
         self.template = self._load_template(template_path)
@@ -60,7 +61,9 @@ class Config():
     def _template_insert_values(template, config):
         imp = template[0]
         ctf = template[2]
-        imp['filesPath'] = '/tmp/' + config.project_name
+        imp['filesPath'] = str(pathlib.Path(
+                            config.working_directory,
+                            config.project_name))
         imp['filesPattern'] = '*.mrc'
         imp['magnification'] = (((config.physical_pixel_size * .000001) /
                                 (config.image_pixel_size * .0000000001)) /
@@ -79,27 +82,49 @@ class Config():
 
     @staticmethod
     def _get_config_values(config):
-        config.project_name = input("Project name: ")
-        config.path_to_gainref = input("Path to gain reference file: ")
+        config.project_name = (
+            config.project_name or
+            input('Project name: '))
+        config.path_to_gainref = (
+            config.path_to_gainref or
+            input('Path to gain reference file (local machine): '))
+        config.source_pattern = (
+            config.source_pattern or
+            input('Pattern to match files for import: '))
+        config.working_directory = (
+            config.working_directory or
+            input('Scratch working directory (/tmp?): '))
         config.frames_to_stack = int(
-            input("Frames to stack (1 for prestacked): "))
+            config.frames_to_stack or
+            input('Frames to stack (1 for prestacked): '))
         config.physical_pixel_size = float(
-            input("Physical pixel size (um): "))
+            config.physical_pixel_size or
+            input('Physical pixel size (5?) (um): '))
         config.image_pixel_size = float(
-            input("Image pixel size (A): "))
-        _super_res = input("Are you running super resolution (y/n): ")
+            config.image_pixel_size or
+            input('Image pixel size (A): '))
+        _super_res = (
+            config.super_resolution or
+            input('Are you running super resolution (y/n): '))
         config.super_resolution = (True if
+                                   _super_res is True or
                                    _super_res[0] in ('y', 'Y')
                                    else False)
         config.ctf_low_res = float(
-            input("CTF search low resolution bound (30?) (A): "))
+            config.ctf_low_res or
+            input('CTF search low resolution bound (30?) (A): '))
         config.ctf_high_res = float(
-            input("CTF search high resolution bound (3?) (A): "))
+            config.ctf_high_res or
+            input('CTF search high resolution bound (3?) (A): '))
         config.defocus_search_min = float(
-            input("Defocus search minimum (.25?) (um): "))
+            config.defocus_search_min or
+            input('Defocus search minimum (.25?) (um): '))
         config.defocus_search_max = float(
-            input("Defocus search maximum (5?) (um): "))
-        config.output_path = input("Path to save scipion config?: ")
+            config.defocus_search_max or
+            input('Defocus search maximum (5?) (um): '))
+        config.scipion_config_path = (
+            config.scipion_config_path or
+            input('File to save scipion config?: '))
         return config
 
     def validate_config(self):
@@ -109,8 +134,10 @@ class Config():
     def _validate_config(config):
         return(all([
             config.project_name is not None,
-            config.src_pattern is not None,
             config.path_to_gainref is not None,
+            config.source_pattern is not None,
+            config.working_directory is not None,
+            pathlib.Path(config.working_directory).exists(),
             pathlib.Path(config.path_to_gainref).exists(),
             config.frames_to_stack > 0,
             config.frames_to_stack < 100,
@@ -128,5 +155,5 @@ class Config():
             config.defocus_search_min < 10,
             config.defocus_search_max > 0,
             config.defocus_search_max < 100,
-            config.output_path is not None
+            config.scipion_config_path is not None
         ]))

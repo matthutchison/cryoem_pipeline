@@ -1,7 +1,8 @@
 from transitions import Machine
 from workflow.monitor import FilePatternMonitor
 from workflow.utilities import (safe_copy_file, compare_hashes, compress_file,
-                                uncompress_file, stack_files, globus_transfer)
+                                uncompress_file, stack_files, globus_transfer,
+                                create_scipion_project, start_scipion_project)
 import asyncio
 import logging
 import os
@@ -17,7 +18,7 @@ class Project():
     '''Overarching project controller
     '''
 
-    def __init__(self, project, pattern, frames=1):
+    def __init__(self, project, pattern, frames=1, scipion_config=None):
         self.project = project
         self.workflow = Workflow()
         self.async = AsyncWorkflowHelper()
@@ -25,13 +26,15 @@ class Project():
         self.paths = {
                 'local_root': '/tmp/' + str(project),
                 'storage_root': '/mnt/nas/' + str(project),
-                'globus_root': '/mnt/NCEF-CryoEM/' + str(project)
+                'globus_root': '/mnt/NCEF-CryoEM/' + str(project),
+                'scipion_config': scipion_config
                 }
         self._ensure_root_directories()
         self.frames = frames
 
     def start(self):
         self._transfer_loop()
+        self.async.add_timed.callback(self._start_scipion, 60)
         self.async.loop.run_until_complete(self._async_start())
 
     async def _async_start(self):
@@ -47,6 +50,24 @@ class Project():
         except StopAsyncIteration:
             import sys
             sys.exit(0)
+
+    def _start_scipion(self):
+        if not self.files['scipion_config']:
+            logger.info('Not starting Scipion, no config file found')
+            return None
+        else:
+            logger.info('Starting Scipion for {0}'.format(self.project))
+        self.async.create_task(
+            create_scipion_project(self.project,
+                                   self.files['scipion_config']),
+            done_cb=self._schedule_scipion_project)
+
+    def _schedule_scipion_project(self, fut=None):
+        if fut.exception():
+            logger.warning('Could not create scipion project. {0}'
+                           .format(fut.exception()))
+        else:
+            self.async.create_task(start_scipion_project(self.project))
 
     def _transfer_loop(self, fut=None):
         self.async.create_task(
@@ -64,7 +85,7 @@ class Project():
             raise KeyError('Project name must not be empty.')
         await asyncio.sleep(pre_wait)
         await globus_transfer(
-            ATC_GLOBUS_ENDPOINT + ':' + str(self.project),
+            ATC_GLOBUS_ENDPOINT + ':/' + str(self.project),
             MOAB_GLOBUS_ENDPOINT + ':' + self.paths['globus_root'],
             '-s', 'mtime',
             '-r',
