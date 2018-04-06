@@ -79,16 +79,14 @@ async def globus_transfer(src_endpoint_spec, dest_endpoint_spec, *args):
 async def create_scipion_project(project_name, config_path):
     '''Start an instance of scipion using the provided project name and config
     '''
-    cmd = ['/usr/local/scipion/scipion', '--config',
-           '/usr/local/scipion/config/scipion.conf',
+    cmd = ['scipion',
            'python', '/usr/local/scipion/scripts/create_project.py',
            project_name, config_path]
     return await _communicate_subprocess_exec(cmd)
 
 
 async def start_scipion_project(project_name):
-    cmd = ['/usr/local/scipion/scipion', '--config',
-           '/usr/local/scipion/config/scipion.conf',
+    cmd = ['scipion',
            'python', '/usr/local/scipion/scripts/schedule_project.py',
            project_name]
     return await _communicate_subprocess_exec(cmd)

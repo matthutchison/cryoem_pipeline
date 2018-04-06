@@ -34,7 +34,7 @@ class Project():
 
     def start(self):
         self._transfer_loop()
-        self.async.add_timed.callback(self._start_scipion, 60)
+        self.async.add_timed_callback(self._start_scipion, 60)
         self.async.loop.run_until_complete(self._async_start())
 
     async def _async_start(self):
@@ -52,14 +52,14 @@ class Project():
             sys.exit(0)
 
     def _start_scipion(self):
-        if not self.files['scipion_config']:
+        if not self.paths['scipion_config']:
             logger.info('Not starting Scipion, no config file found')
             return None
         else:
             logger.info('Starting Scipion for {0}'.format(self.project))
         self.async.create_task(
             create_scipion_project(self.project,
-                                   self.files['scipion_config']),
+                                   self.paths['scipion_config']),
             done_cb=self._schedule_scipion_project)
 
     def _schedule_scipion_project(self, fut=None):
