@@ -124,7 +124,7 @@ class Config():
             input('Defocus search maximum (5?) (um): '))
         config.scipion_config_path = (
             config.scipion_config_path or
-            input('File to save scipion config?: '))
+            '/mnt/nas/Scipion/'+config.project_name+'.json')
         return config
 
     def validate_config(self):

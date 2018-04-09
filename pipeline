@@ -65,13 +65,14 @@ if __name__ == '__main__':
     args = _parse_arguments()
     config = Config(**vars(args))
     config.generate_config()
+    project_name = config.project_name or args.project
     logging.basicConfig(
-        level=getattr(logging, args.debug) if args.debug else logging.WARNING,
-        filename=None or args.log_file)
+        level=getattr(logging, args.debug) if args.debug else logging.INFO,
+        filename=args.log_file or '/mnt/nas/pipeline/'+project_name)
     logging.getLogger('transitions').setLevel(logging.WARNING)
     _check_scipion_installed()
     _check_imod_installed()
-    project = Project(project=config.project_name or args.project,
+    project = Project(project=project_name,
                       pattern=config.source_pattern or args.src_pattern,
                       frames=args.frames or 1,
                       scipion_config=config.scipion_config_path)
