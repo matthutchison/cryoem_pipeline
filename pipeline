@@ -3,6 +3,7 @@ from workflow.workflow import Project
 from workflow.scipion import Config
 import argparse
 import logging
+import os
 import sys
 
 
@@ -72,6 +73,8 @@ if __name__ == '__main__':
     logging.getLogger('transitions').setLevel(logging.WARNING)
     _check_scipion_installed()
     _check_imod_installed()
+    if os.fork():
+        sys.exit()
     project = Project(project=project_name,
                       pattern=config.source_pattern or args.src_pattern,
                       frames=args.frames or 1,
