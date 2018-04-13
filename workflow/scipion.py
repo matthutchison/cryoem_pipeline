@@ -25,7 +25,7 @@ class Config():
 
     def generate_config(self):
         self.get_config_values()
-        self.load_template('workflow/workflow_template.json')
+        self.load_template('/usr/local/pipeline/workflow/workflow_template.json')
         self.template_insert_values()
         self.write_template(self.scipion_config_path)
 
@@ -90,10 +90,10 @@ class Config():
             input('Path to gain reference file (local machine): '))
         config.source_pattern = (
             config.source_pattern or
-            input('Pattern to match files for import: '))
+            input('Pattern to match files for import (ex /path/to/*.mrc): '))
         config.working_directory = (
             config.working_directory or
-            input('Scratch working directory (/tmp?): '))
+            '/tmp')
         config.frames_to_stack = int(
             config.frames_to_stack or
             input('Frames to stack (1 for prestacked): '))
