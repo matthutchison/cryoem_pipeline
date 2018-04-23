@@ -2,7 +2,8 @@ from transitions import Machine
 from workflow.monitor import FilePatternMonitor
 from workflow.utilities import (safe_copy_file, compare_hashes, compress_file,
                                 uncompress_file, stack_files, globus_transfer,
-                                create_scipion_project, start_scipion_project)
+                                create_scipion_project, start_scipion_project,
+                                convert_to_mrc)
 import asyncio
 import logging
 import os
@@ -114,6 +115,7 @@ class Workflow(Machine):
         states = ['initial',
                   'creating',
                   'importing',
+                  'converting',
                   'stacking',
                   'compressing',
                   'exporting',
@@ -133,11 +135,14 @@ class Workflow(Machine):
                             source=['importing', 'stacking'],
                             dest='stacking')
         self.add_transition('compress',
-                            source=['importing', 'stacking', 'compressing'],
+                            source=['importing', 'stacking', 'compressing', 'converting'],
                             dest='compressing')
         self.add_transition('export',
                             source=['compressing', 'exporting'],
                             dest='exporting')
+        self.add_transition('convert_to_mrc',
+                            source=['converting', 'importing'],
+                            dest='converting')
         self.add_transition('hold_for_processing',
                             source=['exporting', 'processing'],
                             dest='processing')
@@ -214,11 +219,27 @@ class WorkflowItem():
         elif fut.result() == 0:
             if self.project.frames > 1:
                 self.stack()
+            elif self.files['original'].suffix == '.dm4':
+                self.convert_to_mrc()
             else:
                 self.files['local_stack'] = self.files['local_original']
                 self.compress()
         else:
             self.async.add_timed_callback(self.import_file, 10)
+
+    def on_enter_converting(self):
+        self.files['local_converted'] = self.files['local_original'].with_suffix('.mrc')
+        self.async.create_task(
+            convert_to_mrc(str(self.files['local_original']),
+                           str(self.files['local_converted'])),
+                self._converting_complete)
+
+    def _converting_complete(self, fut):
+        if fut.exception():
+            self.async.add_timed_callback(self.convert_to_mrc, 10)
+        else:
+            self.files['local_stack'] = self.files['local_original']
+            self.compress()
 
     def on_enter_stacking(self):
         '''Stack the files if the stack parameter evaluates True.
@@ -355,6 +376,7 @@ class WorkflowItem():
         self._remove_file(self.files['local_compressed'])
         self._remove_file(self.files['local_uncompressed'])
         self._remove_file(self.files['local_original'])
+        self._remove_file(self.files['local_converted'])
         self._remove_file(self.files['original'])
         self.finalize()
 

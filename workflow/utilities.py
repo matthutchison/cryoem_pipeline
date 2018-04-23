@@ -50,6 +50,16 @@ async def uncompress_file(path, force=False):
     return await _wait_subprocess_exec(cmd)
 
 
+async def convert_to_mrc(src, dest):
+    '''Convert DM4 to MRC using newstack.
+
+    The -bytes 0 flag is to force the unsigned integer convention that
+    motioncor2 expects.
+    '''
+    cmd = ['newstack', '-bytes', '0', src, dest]
+    return await _communicate_subprocess_exec(cmd)
+
+
 async def stack_files(in_paths, out_path):
     '''Stack the files using imod. Return only after stacking complete.
     '''
