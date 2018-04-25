@@ -69,7 +69,7 @@ if __name__ == '__main__':
     project_name = config.project_name or args.project
     logging.basicConfig(
         level=getattr(logging, args.debug) if args.debug else logging.INFO,
-        filename=args.log_file or '/mnt/nas/pipeline/'+project_name)
+        filename=args.log_file or '/mnt/nas/pipeline/'+project_name+'.log')
     logging.getLogger('transitions').setLevel(logging.WARNING)
     _check_scipion_installed()
     _check_imod_installed()
