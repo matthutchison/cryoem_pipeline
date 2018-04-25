@@ -135,7 +135,8 @@ class Workflow(Machine):
                             source=['importing', 'stacking'],
                             dest='stacking')
         self.add_transition('compress',
-                            source=['importing', 'stacking', 'compressing', 'converting'],
+                            source=['importing', 'stacking', 'compressing',
+                                    'converting'],
                             dest='compressing')
         self.add_transition('export',
                             source=['compressing', 'exporting'],
@@ -228,11 +229,12 @@ class WorkflowItem():
             self.async.add_timed_callback(self.import_file, 10)
 
     def on_enter_converting(self):
-        self.files['local_converted'] = self.files['local_original'].with_suffix('.mrc')
+        self.files['local_converted'] = \
+            self.files['local_original'].with_suffix('.mrc')
         self.async.create_task(
             convert_to_mrc(str(self.files['local_original']),
                            str(self.files['local_converted'])),
-                self._converting_complete)
+            self._converting_complete)
 
     def _converting_complete(self, fut):
         if fut.exception():
