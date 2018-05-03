@@ -24,3 +24,11 @@ class MonitorTest(unittest.TestCase):
     def test_await_before_walltime_doesnt_raise_StopAsyncIteration(self):
         fpm = mon.FilePatternMonitor('./*', walltime=1)
         self.loop.run_until_complete(self.next_monitor_result(fpm))
+
+    def test_monitor_returns_nonzero_files(self):
+        fpm = mon.FilePatternMonitor('./*', walltime=1)
+
+        async def has_files(monitor):
+            res = await monitor
+            self.assertTrue(len(res) > 0)
+        self.loop.run_until_complete(has_files(fpm))
