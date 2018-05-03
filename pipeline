@@ -48,6 +48,12 @@ def _parse_arguments():
                         type=int,
                         help='Set to the number of frames that will need to be\
                         stacked per-movie. Defaults to 1 (already stacked).')
+    parser.add_argument('--no-scipion',
+                        required=False,
+                        action='store_true',
+                        help='Disable scipion startup. Useful for restarting\
+                        transfers if scipion is already running or is being\
+                        started separately.')
     parser.add_argument('-v', '--debug', '--verbosity',
                         required=False,
                         type=str,
@@ -78,5 +84,6 @@ if __name__ == '__main__':
     project = Project(project=project_name,
                       pattern=config.source_pattern or args.src_pattern,
                       frames=args.frames or 1,
-                      scipion_config=config.scipion_config_path)
+                      scipion_config=(None if args.no_scipion
+                                      else config.scipion_config_path))
     project.start()

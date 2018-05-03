@@ -378,7 +378,8 @@ class WorkflowItem():
         self._remove_file(self.files['local_compressed'])
         self._remove_file(self.files['local_uncompressed'])
         self._remove_file(self.files['local_original'])
-        self._remove_file(self.files['local_converted'])
+        if 'local_converted' in self.files.keys():
+            self._remove_file(self.files['local_converted'])
         self._remove_file(self.files['original'])
         self.finalize()
 
