@@ -31,6 +31,12 @@ def _check_scipion_installed():
         sys.exit(1)
 
 
+def _check_lbzip2_installed():
+    from shutil import which
+    if which('lbzip2') is None:
+        print('This application requires lbzip2 be installed. Exiting')
+
+
 def _parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument('--project', '-p',
@@ -69,6 +75,9 @@ def _parse_arguments():
 
 if __name__ == '__main__':
     _check_python_version_compatible()
+    _check_scipion_installed()
+    _check_imod_installed()
+    _check_lbzip2_installed()
     args = _parse_arguments()
     config = Config(**vars(args))
     config.generate_config()
@@ -77,8 +86,6 @@ if __name__ == '__main__':
         level=getattr(logging, args.debug) if args.debug else logging.INFO,
         filename=args.log_file or '/mnt/nas/pipeline/'+project_name+'.log')
     logging.getLogger('transitions').setLevel(logging.WARNING)
-    _check_scipion_installed()
-    _check_imod_installed()
     if os.fork():
         sys.exit()
     project = Project(project=project_name,
