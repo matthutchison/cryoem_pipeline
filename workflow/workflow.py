@@ -262,7 +262,8 @@ class WorkflowItem():
             return
         if ('local_unstacked' in self.files and
                 len(self.files['local_unstacked']) == self.project.frames):
-            pths = [f.files['original'] for f in self.files['local_unstacked']]
+            pths = [f.files['local_original']
+                    for f in self.files['local_unstacked']]
             self.async.create_task(stack_files(pths,
                                                self.files['original']),
                                    done_cb=self._stacking_complete)
