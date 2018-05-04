@@ -32,6 +32,8 @@ class Project():
                 }
         self._ensure_root_directories()
         self.frames = frames
+        self.workflow.MIN_IMPORT_INTERVAL = \
+            self.workflow.MIN_IMPORT_INTERVAL / self.frames
 
     def start(self):
         self._transfer_loop()
@@ -151,7 +153,7 @@ class Workflow(Machine):
                             source=['processing', 'exporting'],
                             dest='confirming')
         self.add_transition('clean',
-                            source=['confirming'],
+                            source=['stacking', 'confirming'],
                             dest='cleaning')
         self.add_transition('finalize', source='cleaning', dest='finished')
 
@@ -258,9 +260,10 @@ class WorkflowItem():
         if self.project.frames == 1:
             self.compress()
             return
-        if ('local_unstacked' in self.files.keys() and
+        if ('local_unstacked' in self.files and
                 len(self.files['local_unstacked']) == self.project.frames):
-            self.async.create_task(stack_files(self.files['local_unstacked'],
+            pths = [f.files['original'] for f in self.files['local_unstacked']]
+            self.async.create_task(stack_files(pths,
                                                self.files['original']),
                                    done_cb=self._stacking_complete)
         else:
@@ -338,7 +341,7 @@ class WorkflowItem():
 
         Confirm that:
         - The compression cycle is correct (hash original and re-uncompressed)
-        - The transfer to moab is complete
+        - The transfer to storage is complete
         '''
         new_name = self.files['local_original'].with_suffix('.orig')
         self.files['local_uncompressed'] = self.files['local_original']
@@ -374,14 +377,19 @@ class WorkflowItem():
         self.clean()
 
     def on_enter_cleaning(self):
-        self._remove_file(self.files['local_stack'])
-        self._remove_file(self.files['local_compressed'])
-        self._remove_file(self.files['local_uncompressed'])
-        self._remove_file(self.files['local_original'])
-        if 'local_converted' in self.files.keys():
-            self._remove_file(self.files['local_converted'])
-        self._remove_file(self.files['original'])
+        self._safe_remove_file('local_stack')
+        self._safe_remove_file('local_compressed')
+        self._safe_remove_file('local_uncompressed')
+        self._safe_remove_file('local_original')
+        self._safe_remove_file('local_converted')
+        self._safe_remove_file('original')
         self.finalize()
+
+    def _safe_remove_file(self, key):
+        try:
+            self._remove_file(self.files[key])
+        except KeyError:
+            pass
 
     def _remove_file(self, path):
         try:
