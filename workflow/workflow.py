@@ -158,7 +158,7 @@ class Workflow(Machine):
         self.add_transition('finalize', source='cleaning', dest='finished')
 
     def get_model(self, key):
-        models = [model for model in self.models
+        models = [model for model in self.models[1:]
                   if model.files['original'] == key]
         return models[0] if models else None
 
@@ -266,13 +266,14 @@ class WorkflowItem():
             self.async.create_task(stack_files(pths,
                                                self.files['original']),
                                    done_cb=self._stacking_complete)
-        else:
-            stack_key = self.files['local_original'].name[:-2]
+        elif 'local_unstacked' not in self.files:
+            stack_key = self.files['local_original'].stem[:-2] +\
+                self.files['local_original'].suffix
             stack_path = self.files['local_original'].with_name(stack_key)
-            model = WorkflowItem(stack_path, self.workflow, self.project)
-            try:
-                model = self.workflow.get_model(stack_path)
-            except KeyError:
+            model = self.workflow.get_model(stack_path)
+            if not model:
+                model = WorkflowItem(stack_path, self.workflow, self.project)
+                model.files['local_stack'] = stack_path
                 self.workflow.add_model(model, initial='stacking')
             try:
                 model.files['local_unstacked'].append(self)
@@ -281,7 +282,7 @@ class WorkflowItem():
             model.stack()
 
     def _stacking_complete(self, fut):
-        if fut.result() == 0:
+        if not fut.exception():
             [x.clean() for x in self.files['local_unstacked']]
             del self.files['local_unstacked']
             self.compress()
