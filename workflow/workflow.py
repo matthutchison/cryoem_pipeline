@@ -262,19 +262,17 @@ class WorkflowItem():
             return
         if ('local_unstacked' in self.files and
                 len(self.files['local_unstacked']) == self.project.frames):
-            pths = [f.files['local_original']
-                    for f in self.files['local_unstacked']]
+            pths = [f.files['original'] for f in self.files['local_unstacked']]
             self.async.create_task(stack_files(pths,
                                                self.files['original']),
                                    done_cb=self._stacking_complete)
-        elif 'local_unstacked' not in self.files:
-            stack_key = self.files['local_original'].stem[:-2] +\
-                self.files['local_original'].suffix
+        else:
+            stack_key = self.files['local_original'].name[:-2]
             stack_path = self.files['local_original'].with_name(stack_key)
-            model = self.workflow.get_model(stack_path)
-            if not model:
-                model = WorkflowItem(stack_path, self.workflow, self.project)
-                model.files['local_stack'] = stack_path
+            model = WorkflowItem(stack_path, self.workflow, self.project)
+            try:
+                model = self.workflow.get_model(stack_path)
+            except KeyError:
                 self.workflow.add_model(model, initial='stacking')
             try:
                 model.files['local_unstacked'].append(self)
@@ -283,7 +281,7 @@ class WorkflowItem():
             model.stack()
 
     def _stacking_complete(self, fut):
-        if not fut.exception():
+        if fut.result() == 0:
             [x.clean() for x in self.files['local_unstacked']]
             del self.files['local_unstacked']
             self.compress()
