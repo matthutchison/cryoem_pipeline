@@ -86,6 +86,7 @@ if __name__ == '__main__':
         level=getattr(logging, args.debug) if args.debug else logging.INFO,
         filename=args.log_file or '/mnt/nas/pipeline/'+project_name+'.log')
     logging.getLogger('transitions').setLevel(logging.WARNING)
+    logger = logging.getLogger('__name__')
     if os.fork():
         sys.exit()
     project = Project(project=project_name,
@@ -93,4 +94,7 @@ if __name__ == '__main__':
                       frames=args.frames or 1,
                       scipion_config=(None if args.no_scipion
                                       else config.scipion_config_path))
+    logger.info('Parameters')
+    for val in vars(config):
+        logger.info(val, getattr(config, val))
     project.start()
