@@ -1,7 +1,10 @@
+from glob import glob
 import json
 import os
 import pathlib
 import sys
+
+APPLICATION_PATH = os.path.abspath(os.path.dirname(sys.argv[0]))
 
 
 class Config():
@@ -25,7 +28,11 @@ class Config():
 
     def generate_config(self):
         self.get_config_values()
-        self.load_template('/usr/local/pipeline/workflow/workflow_template.json')
+        if not self.validate_config():
+            sys.exit('Configuration validation failed.')
+        self.load_template(
+            '%s/workflow/workflow_template.json' %
+            APPLICATION_PATH)
         self.template_insert_values()
         self.write_template(self.scipion_config_path)
 
@@ -125,35 +132,67 @@ class Config():
         config.scipion_config_path = (
             config.scipion_config_path or
             '/mnt/nas/Scipion/'+config.project_name+'.json')
-        return config
 
     def validate_config(self):
         return self._validate_config(self)
 
     @staticmethod
     def _validate_config(config):
+        def _v_wrap(test, msg):
+            if test:
+                print(msg, file=sys.stderr)
+                return False
+            else:
+                return True
         return(all([
-            config.project_name is not None,
-            config.path_to_gainref is not None,
-            config.source_pattern is not None,
-            config.working_directory is not None,
-            pathlib.Path(config.working_directory).exists(),
-            pathlib.Path(config.path_to_gainref).exists(),
-            config.frames_to_stack > 0,
-            config.frames_to_stack < 100,
-            config.physical_pixel_size > 1,
-            config.physical_pixel_size < 50,
-            config.image_pixel_size < 5,
-            config.image_pixel_size > 0.1,
-            config.super_resolution in (True, False),
-            config.ctf_low_res < 50,
-            config.ctf_low_res > 1,
-            config.ctf_high_res > 1,
-            config.ctf_high_res < 50,
-            config.ctf_low_res > config.ctf_high_res,
-            config.defocus_search_min > 0,
-            config.defocus_search_min < 10,
-            config.defocus_search_max > 0,
-            config.defocus_search_max < 100,
-            config.scipion_config_path is not None
+            _v_wrap(not config.project_name,
+                    'Project name blank'),
+            _v_wrap(not config.path_to_gainref,
+                    'Path to gain ref blank'),
+            _v_wrap(not pathlib.Path(config.path_to_gainref).exists(),
+                    'Path to gain ref does not exist'),
+            _v_wrap(not config.source_pattern,
+                    'Source pattern is blank'),
+            _v_wrap(not(len(glob(config.source_pattern)) > 0),
+                    'No files matching pattern %s' % config.source_pattern),
+            _v_wrap(not config.working_directory,
+                    'Working dir blank'),
+            _v_wrap(not pathlib.Path(config.working_directory).exists(),
+                    'Work dir %s does not exist' % config.working_directory),
+            _v_wrap(not config.frames_to_stack > 0,
+                    'Frames to stack out of range 1-100'),
+            _v_wrap(not config.frames_to_stack < 100,
+                    'Frames to stack out of range 1-100'),
+            _v_wrap(not config.physical_pixel_size >= 1,
+                    'Physical pixel size out of range 1-50'),
+            _v_wrap(not config.physical_pixel_size <= 50,
+                    'Physical pixel size out of ramge 1-50'),
+            _v_wrap(not config.image_pixel_size < 5,
+                    'Image pixel size out of range 0.1-5'),
+            _v_wrap(not config.image_pixel_size > 0.1,
+                    'Image pixel size out of range 0.1-5'),
+            _v_wrap(config.super_resolution not in (True, False),
+                    'Super resolution value invalid. Valid are True, False.'),
+            _v_wrap(not config.ctf_low_res < 50,
+                    'CTF low resolution out of range 1-50'),
+            _v_wrap(not config.ctf_low_res > 1,
+                    'CTF low resolution out of range 1-50'),
+            _v_wrap(not config.ctf_high_res < 50,
+                    'CTF high resolution out of range 1-50'),
+            _v_wrap(not config.ctf_high_res > 1,
+                    'CTF high resolution out of range 1-50'),
+            _v_wrap(config.ctf_low_res < config.ctf_high_res,
+                    'CTF high resolution lower than CTF low resolution'),
+            _v_wrap(not config.defocus_search_min > 0,
+                    'Defocus search minimum out of range 0-10'),
+            _v_wrap(not config.defocus_search_min < 10,
+                    'defocus search minimum out of range 0-10'),
+            _v_wrap(not config.defocus_search_max > 0,
+                    'Defocus search maximum out of range 0-100'),
+            _v_wrap(not config.defocus_search_max < 100,
+                    'Defocus search maximum out of range 0-100'),
+            _v_wrap(config.defocus_search_min > config.defocus_search_max,
+                    'Defocus search min higher than defocus search max'),
+            _v_wrap(config.scipion_config_path is None,
+                    'Scipion configuration path could not be generated'),
         ]))
