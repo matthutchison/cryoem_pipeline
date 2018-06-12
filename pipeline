@@ -74,11 +74,11 @@ def _parse_arguments():
 
 
 if __name__ == '__main__':
+    args = _parse_arguments()
     _check_python_version_compatible()
     _check_scipion_installed()
     _check_imod_installed()
     _check_lbzip2_installed()
-    args = _parse_arguments()
     config = Config(**vars(args))
     config.generate_config()
     project_name = config.project_name or args.project
