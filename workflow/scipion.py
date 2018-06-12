@@ -195,4 +195,8 @@ class Config():
                     'Defocus search min higher than defocus search max'),
             _v_wrap(config.scipion_config_path is None,
                     'Scipion configuration path could not be generated'),
+            _v_wrap(pathlib.Path(config.scipion_config_path).exists(),
+                    'Scipion configuration file %s already exists.\
+                    select a unique project name.' %
+                    config.scipion_config_path),
         ]))
