@@ -1,10 +1,11 @@
 from glob import glob
+import errno
 import json
 import os
 import pathlib
 import sys
 
-APPLICATION_PATH = os.path.abspath(os.path.dirname(sys.argv[0]))
+APPLICATION_PATH = os.path.realpath(sys.path[0])
 
 
 class Config():
@@ -42,7 +43,10 @@ class Config():
     @staticmethod
     def _load_template(path):
         if not os.path.exists(path):
-            raise FileNotFoundError
+            raise FileNotFoundError(
+                errno.ENOENT,
+                os.strerror(errno.ENOENT),
+                path)
         with open(path, mode='r', encoding='utf8') as f:
             try:
                 temp = json.loads(f.read())
@@ -56,7 +60,10 @@ class Config():
     @staticmethod
     def _write_template(data, path, force):
         if os.path.exists(path) and not force:
-            raise FileExistsError
+            raise FileExistsError(
+                errno.EEXIST,
+                os.strerror(errno.EEXIST),
+                path)
         with open(path, mode='w', encoding='utf8') as f:
             f.write(json.dumps(data, sort_keys=True, indent=4))
             f.close()

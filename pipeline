@@ -96,5 +96,5 @@ if __name__ == '__main__':
                                       else config.scipion_config_path))
     logger.info('Parameters')
     for val in vars(config):
-        logger.info(val, getattr(config, val))
+        logger.info(': '.join((val, str(getattr(config, val)))))
     project.start()
