@@ -1,5 +1,7 @@
 import asyncio
+import errno
 import logging
+import os
 
 
 logger = logging.getLogger(__name__)
@@ -27,7 +29,11 @@ async def compare_hashes(path_a, path_b):
     if a[0] and b[0]:
         return a[0].split()[0] == b[0].split()[0]
     else:
-        raise FileNotFoundError
+        raise FileNotFoundError(
+            errno.ENOENT,
+            os.strerror(errno.ENOENT),
+            (a, b)
+        )
 
 
 async def compress_file(path, force=False):
@@ -56,7 +62,7 @@ async def convert_to_mrc(src, dest):
     The -bytes 0 flag is to force the unsigned integer convention that
     motioncor2 expects.
     '''
-    cmd = ['newstack', '-bytes', '0', src, dest]
+    cmd = ['newstack', '-bytes', '0', str(src), str(dest)]
     return await _communicate_subprocess_exec(cmd)
 
 

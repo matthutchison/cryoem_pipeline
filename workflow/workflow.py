@@ -232,8 +232,8 @@ class WorkflowItem():
         self.files['local_converted'] = \
             self.files['local_original'].with_suffix('.mrc')
         self.async.create_task(
-            convert_to_mrc(str(self.files['local_original']),
-                           str(self.files['local_converted'])),
+            convert_to_mrc(self.files['local_original'],
+                           self.files['local_converted']),
             self._converting_complete)
 
     def _converting_complete(self, fut):
