@@ -125,14 +125,14 @@ async def create_scipion_project(project_name, config_path):
     '''Start an instance of scipion using the provided project name and config
     '''
     cmd = ['scipion',
-           'python', '/usr/local/scipion/scripts/create_project.py',
+           'python', '$SCIPION_HOME/scripts/create_project.py',
            project_name, config_path]
     return await _communicate_subprocess_exec(cmd)
 
 
 async def start_scipion_project(project_name):
     cmd = ['scipion',
-           'python', '/usr/local/scipion/scripts/schedule_project.py',
+           'python', '$SCIPION_HOME/scripts/schedule_project.py',
            project_name]
     return await _communicate_subprocess_exec(cmd)
 
