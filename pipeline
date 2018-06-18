@@ -70,7 +70,7 @@ if __name__ == '__main__':
         level=getattr(logging, args.debug) if args.debug else logging.INFO,
         filename=args.log_file or '/mnt/nas/pipeline/'+project_name+'.log')
     logging.getLogger('transitions').setLevel(logging.WARNING)
-    logger = logging.getLogger('__name__')
+    logger = logging.getLogger(__name__)
     if os.fork():
         sys.exit()
     project = Project(project=project_name,
