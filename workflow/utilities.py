@@ -2,27 +2,52 @@ import asyncio
 import errno
 import logging
 import os
+import pathlib
 
 
 logger = logging.getLogger(__name__)
 
 
 async def safe_copy_file(src, dest):
-    '''Copy the file from source to dest.
+    '''Async copy the file from src to dest using system cp.
+
+    Parameters:
+    src (string or pathlike object): path to the source file
+    dest (string or pathlike object): path to the destination
+
+    Creates a cp subprocess. Primarily useful for copying extremely large
+    files without blocking the main thread. Fails if file already exists.
     '''
+    if pathlib.Path(dest).exists():
+        raise FileExistsError(
+            errno.EEXIST,
+            os.strerror(errno.EEXIST),
+            dest)
     cmd = ['cp', str(src), str(dest)]
     return await _wait_subprocess_exec(cmd)
 
 
 async def file_hash(path):
-    '''Get the sha1 hash of the given file.
+    '''Async get the sha1 hash of the given file using system shasum.
+
+    Parameters:
+    path (string or pathlike object): the path to the file to hash
+
+    Creates a shasum subprocess. Returns the output of shasum as a 2-tuple
+    of bytes.
+    (b'af9fce487c7d1e5d6101d5317b9884481a874442  /path/to/file', b'')
+    First element is the stdout result of shasum, second is the stderr.
     '''
     cmd = ['shasum', str(path)]
     return await _communicate_subprocess_exec(cmd)
 
 
 async def compare_hashes(path_a, path_b):
-    '''Compare the hashes of two files
+    '''Compare the hashes of two files.
+
+    Parameters:
+    path_a, path_b (string or pathlike object): the paths to the files to hash
+        and compare.
     '''
     a = await file_hash(path_a)
     b = await file_hash(path_b)
@@ -38,6 +63,10 @@ async def compare_hashes(path_a, path_b):
 
 async def compress_file(path, force=False):
     '''Compress the file using lbzip2. Returns only after compression complete.
+
+    Parameters:
+    path (string or pathlib.Path): path of file to compress
+    force (bool): overwrite existing files (default False)
 
     Defaults are set for the ATC linux box to not saturate. Adjust if necessary
     '''
