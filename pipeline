@@ -7,34 +7,21 @@ import os
 import sys
 
 
-def _check_python_version_compatible():
+def _check_applications():
     if sys.version_info < (3, 5):
-        print('This application requires Python 3.5 or greater.\n',
-              'Version',
-              str(sys.version_info),
-              'detected.'
-              )
-        sys.exit(1)
-
-
-def _check_imod_installed():
-    from shutil import which
-    if which('imod') is None:
-        print('This application requires imod be installed. Exiting')
-        sys.exit(1)
-
-
-def _check_scipion_installed():
-    from shutil import which
-    if which('scipion') is None:
-        print('This application requires scipion be installed. Exiting')
-        sys.exit(1)
-
-
-def _check_lbzip2_installed():
+        msg = ''.join(
+            ('This application requires Python 3.5 or greater.\n',
+             'Version',
+             str(sys.version_info),
+             'detected.'))
+        sys.exit(msg)
     from shutil import which
     if which('lbzip2') is None:
-        print('This application requires lbzip2 be installed. Exiting')
+        sys.exit('This application requires lbzip2 be installed. Exiting')
+    if which('scipion') is None:
+        sys.exit('This application requires scipion be installed. Exiting')
+    if which('imod') is None:
+        sys.exit('This application requires imod be installed. Exiting')
 
 
 def _parse_arguments():
@@ -75,10 +62,7 @@ def _parse_arguments():
 
 if __name__ == '__main__':
     args = _parse_arguments()
-    _check_python_version_compatible()
-    _check_scipion_installed()
-    _check_imod_installed()
-    _check_lbzip2_installed()
+    _check_applications()
     config = Config(**vars(args))
     config.generate_config()
     project_name = config.project_name or args.project
