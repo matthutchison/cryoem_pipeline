@@ -22,7 +22,7 @@ class Project():
     def __init__(self, project, pattern, frames=1, scipion_config=None):
         self.project = project
         self.workflow = Workflow()
-        self.async = AsyncWorkflowHelper()
+        self.awh = AsyncWorkflowHelper()
         self.monitor = FilePatternMonitor(pattern)
         self.paths = {
                 'local_root': '/tmp/' + str(project),
@@ -35,8 +35,8 @@ class Project():
 
     def start(self):
         self._transfer_loop()
-        self.async.add_timed_callback(self._start_scipion, 60)
-        self.async.loop.run_until_complete(self._async_start())
+        self.awh.add_timed_callback(self._start_scipion, 60)
+        self.awh.loop.run_until_complete(self._async_start())
 
     async def _async_start(self):
         try:
@@ -58,7 +58,7 @@ class Project():
             return None
         else:
             logger.info('Starting Scipion for {0}'.format(self.project))
-        self.async.create_task(
+        self.awh.create_task(
             create_scipion_project(self.project,
                                    self.paths['scipion_config']),
             done_cb=self._schedule_scipion_project)
@@ -68,10 +68,10 @@ class Project():
             logger.warning('Could not create scipion project. {0}'
                            .format(fut.exception()))
         else:
-            self.async.create_task(start_scipion_project(self.project))
+            self.awh.create_task(start_scipion_project(self.project))
 
     def _transfer_loop(self, fut=None):
-        self.async.create_task(
+        self.awh.create_task(
             self._schedule_globus_transfer(),
             done_cb=self._transfer_loop
         )
@@ -170,7 +170,7 @@ class WorkflowItem():
         self.files = {'original': pathlib.Path(path)}
         self.project = project
         self.workflow = workflow
-        self.async = project.async
+        self.awh = project.awh
         logger.info('Starting: {0}'.format(self.files['original']))
 
     def _delta_mtime(self, path):
@@ -200,7 +200,7 @@ class WorkflowItem():
         fancier like inotify.
         '''
         dt = self._delta_mtime(self.files['original'])
-        self.import_file() if dt > 15 else self.async.add_timed_callback(
+        self.import_file() if dt > 15 else self.awh.add_timed_callback(
                 self.on_enter_creating, 16 - dt)
 
     def on_enter_importing(self):
@@ -209,14 +209,14 @@ class WorkflowItem():
         self.files['local_original'] = pathlib.Path(
                 self.project.paths['local_root'],
                 self.files['original'].name)
-        self.async.create_task(
+        self.awh.create_task(
             safe_copy_file(self.files['original'],
                            self.files['local_original']),
             self._importing_complete)
 
     def _importing_complete(self, fut):
         if fut.exception():
-            self.async.add_timed_callback(self.import_file, 10)
+            self.awh.add_timed_callback(self.import_file, 10)
         elif fut.result() == 0:
             if self.project.frames > 1:
                 self.stack()
@@ -226,19 +226,19 @@ class WorkflowItem():
                 self.files['local_stack'] = self.files['local_original']
                 self.compress()
         else:
-            self.async.add_timed_callback(self.import_file, 10)
+            self.awh.add_timed_callback(self.import_file, 10)
 
     def on_enter_converting(self):
         self.files['local_converted'] = \
             self.files['local_original'].with_suffix('.mrc')
-        self.async.create_task(
+        self.awh.create_task(
             convert_to_mrc(self.files['local_original'],
                            self.files['local_converted']),
             self._converting_complete)
 
     def _converting_complete(self, fut):
         if fut.exception():
-            self.async.add_timed_callback(self.convert_to_mrc, 10)
+            self.awh.add_timed_callback(self.convert_to_mrc, 10)
         else:
             self.files['local_stack'] = self.files['local_original']
             self.compress()
@@ -260,9 +260,9 @@ class WorkflowItem():
             return
         if ('local_unstacked' in self.files.keys() and
                 len(self.files['local_unstacked']) == self.project.frames):
-            self.async.create_task(stack_files(self.files['local_unstacked'],
-                                               self.files['original']),
-                                   done_cb=self._stacking_complete)
+            self.awh.create_task(stack_files(self.files['local_unstacked'],
+                                             self.files['original']),
+                                 done_cb=self._stacking_complete)
         else:
             stack_key = self.files['local_original'].name[:-2]
             stack_path = self.files['local_original'].with_name(stack_key)
@@ -292,7 +292,7 @@ class WorkflowItem():
         compression function should call back when complete to trigger
         the move to the next state.
         '''
-        self.async.create_task(
+        self.awh.create_task(
             compress_file(self.files['local_stack'], force=True),
             done_cb=self._compressing_complete)
         self.files['local_compressed'] = self.files['local_stack'].with_suffix(
@@ -307,7 +307,7 @@ class WorkflowItem():
         self.files['storage_final'] = pathlib.Path(
             self.project.paths['storage_root'],
             self.files['local_compressed'].name)
-        self.async.create_task(
+        self.awh.create_task(
             safe_copy_file(
                 self.files['local_compressed'],
                 self.files['storage_final']),
@@ -315,11 +315,11 @@ class WorkflowItem():
 
     def _exporting_complete(self, fut):
         if fut.exception():
-            self.async.add_timed_callback(self.export, 10)
+            self.awh.add_timed_callback(self.export, 10)
         elif fut.result() == 0:
             self.hold_for_processing()
         else:
-            self.async.add_timed_callback(self.export, 10)
+            self.awh.add_timed_callback(self.export, 10)
 
     def on_enter_processing(self):
         '''Maintain processing state until scipion processing is complete.
@@ -331,7 +331,7 @@ class WorkflowItem():
         if self._is_processing_complete(self.files['local_stack']):
             self.confirm()
         else:
-            self.async.add_timed_callback(self.hold_for_processing, 10)
+            self.awh.add_timed_callback(self.hold_for_processing, 10)
 
     def on_enter_confirming(self):
         '''Verify compression and that storage transfer is complete
@@ -344,7 +344,7 @@ class WorkflowItem():
         self.files['local_uncompressed'] = self.files['local_original']
         self.files['local_original'].rename(new_name)
         self.files['local_original'] = pathlib.Path(new_name)
-        self.async.create_task(
+        self.awh.create_task(
             uncompress_file(self.files['local_compressed'], force=True),
             self._uncompress_complete)
 
@@ -352,7 +352,7 @@ class WorkflowItem():
         size_match = (os.stat(str(self.files['local_compressed'])).st_size ==
                       os.stat(str(self.files['storage_final'])).st_size)
         if size_match:
-            self.async.create_task(
+            self.awh.create_task(
                 compare_hashes(
                     self.files['local_original'],
                     self.files['local_uncompressed']),
@@ -362,7 +362,7 @@ class WorkflowItem():
 
     def _hashes_complete(self, fut):
         if fut.exception():
-            self.async.add_timed_callback(
+            self.awh.add_timed_callback(
                 self._uncompress_complete, 10)
             logger.warning(fut.exception())
         elif fut.result() is True:
