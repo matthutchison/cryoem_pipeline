@@ -23,7 +23,7 @@ class Project():
         self.project = project
         self.workflow = Workflow()
         self.awh = AsyncWorkflowHelper()
-        self.monitor = FilePatternMonitor(pattern)
+        self.monitor = FilePatternMonitor(pattern, recursive=True)
         self.paths = {
                 'local_root': '/tmp/' + str(project),
                 'storage_root': '/mnt/nas/' + str(project),
@@ -32,6 +32,12 @@ class Project():
                 }
         self._ensure_root_directories()
         self.frames = frames
+        if self.frames > 1:
+            self._ensure_directory(str(
+                pathlib.Path(self.paths['local_root']).joinpath(
+                pathlib.Path('stack'))))
+        self.workflow.MIN_IMPORT_INTERVAL = \
+            self.workflow.MIN_IMPORT_INTERVAL / self.frames
 
     def start(self):
         self._transfer_loop()
@@ -151,14 +157,17 @@ class Workflow(Machine):
                             source=['processing', 'exporting'],
                             dest='confirming')
         self.add_transition('clean',
-                            source=['confirming'],
+                            source=['stacking', 'confirming'],
                             dest='cleaning')
         self.add_transition('finalize', source='cleaning', dest='finished')
 
     def get_model(self, key):
-        models = [model for model in self.models
+        models = [model for model in self.models[1:]
                   if model.files['original'] == key]
-        return models[0] if models else None
+        if models:
+            return models[0]
+        else:
+            raise KeyError
 
 
 class WorkflowItem():
@@ -258,15 +267,21 @@ class WorkflowItem():
         if self.project.frames == 1:
             self.compress()
             return
-        if ('local_unstacked' in self.files.keys() and
+        if ('local_unstacked' in self.files and
                 len(self.files['local_unstacked']) == self.project.frames):
-            self.awh.create_task(stack_files(self.files['local_unstacked'],
+            pths = [f.files['original'] for f in self.files['local_unstacked']]
+            self.awh.create_task(stack_files(pths,
                                              self.files['original']),
                                  done_cb=self._stacking_complete)
-        else:
-            stack_key = self.files['local_original'].name[:-2]
-            stack_path = self.files['local_original'].with_name(stack_key)
+        elif 'local_unstacked' not in self.files:
+            stack_key = self.files['local_original'].stem[:-2] +\
+                self.files['local_original'].suffix
+            stack_path = self.files['local_original'].parent.joinpath(
+                pathlib.Path('stack')).joinpath(
+                pathlib.Path(stack_key))
             model = WorkflowItem(stack_path, self.workflow, self.project)
+            model.files['local_original'] = stack_path
+            model.files['local_stack'] = model.files['local_original']
             try:
                 model = self.workflow.get_model(stack_path)
             except KeyError:
@@ -276,11 +291,12 @@ class WorkflowItem():
             except KeyError:
                 model.files['local_unstacked'] = [self]
             model.stack()
+        else:
+            pass
+            # Only stack models before hitting the frame count should get here
 
     def _stacking_complete(self, fut):
-        if fut.result() == 0:
-            [x.clean() for x in self.files['local_unstacked']]
-            del self.files['local_unstacked']
+        if not fut.exception():
             self.compress()
         else:
             pass
@@ -338,7 +354,7 @@ class WorkflowItem():
 
         Confirm that:
         - The compression cycle is correct (hash original and re-uncompressed)
-        - The transfer to moab is complete
+        - The transfer to storage is complete
         '''
         new_name = self.files['local_original'].with_suffix('.orig')
         self.files['local_uncompressed'] = self.files['local_original']
@@ -374,14 +390,21 @@ class WorkflowItem():
         self.clean()
 
     def on_enter_cleaning(self):
-        self._remove_file(self.files['local_stack'])
-        self._remove_file(self.files['local_compressed'])
-        self._remove_file(self.files['local_uncompressed'])
-        self._remove_file(self.files['local_original'])
-        if 'local_converted' in self.files.keys():
-            self._remove_file(self.files['local_converted'])
-        self._remove_file(self.files['original'])
+        self._safe_remove_file('local_stack')
+        self._safe_remove_file('local_compressed')
+        self._safe_remove_file('local_uncompressed')
+        self._safe_remove_file('local_original')
+        self._safe_remove_file('local_converted')
+        self._safe_remove_file('original')
+        if 'local_unstacked' in self.files:
+            [x.clean() for x in self.files['local_unstacked']]
         self.finalize()
+
+    def _safe_remove_file(self, key):
+        try:
+            self._remove_file(self.files[key])
+        except KeyError:
+            pass
 
     def _remove_file(self, path):
         try:

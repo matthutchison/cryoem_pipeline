@@ -98,8 +98,9 @@ async def convert_to_mrc(src, dest):
 async def stack_files(in_paths, out_path):
     '''Stack the files using imod. Return only after stacking complete.
     '''
-    cmd = ['newstack', '-bytes 0', *[str(p) for p in in_paths], str(out_path)]
-    return await _wait_subprocess_exec(cmd)
+    cmd = ['newstack', '-bytes', '0', *[str(p) for p in in_paths],
+           str(out_path)]
+    return await _communicate_subprocess_exec(cmd)
 
 
 async def globus_transfer(src_endpoint_spec, dest_endpoint_spec, *args):

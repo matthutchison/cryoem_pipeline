@@ -75,7 +75,7 @@ if __name__ == '__main__':
         sys.exit()
     project = Project(project=project_name,
                       pattern=config.source_pattern or args.src_pattern,
-                      frames=args.frames or 1,
+                      frames=config.frames_to_stack or args.frames or 1,
                       scipion_config=(None if args.no_scipion
                                       else config.scipion_config_path))
     logger.info('Parameters')
