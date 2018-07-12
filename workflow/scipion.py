@@ -78,7 +78,8 @@ class Config():
         imp['filesPath'] = str(pathlib.Path(
                             config.working_directory,
                             config.project_name))
-        imp['filesPattern'] = '*.mrc'
+        imp['filesPattern'] = ('stack/*.mrc' if config.frames_to_stack > 1
+                               else '*.mrc*')
         imp['magnification'] = (((config.physical_pixel_size * .000001) /
                                 (config.image_pixel_size * .0000000001)) /
                                 (2 if config.super_resolution else 1))
@@ -160,7 +161,7 @@ class Config():
                     'Path to gain ref does not exist'),
             _v_wrap(not config.source_pattern,
                     'Source pattern is blank'),
-            _v_wrap(not(len(glob(config.source_pattern)) > 0),
+            _v_wrap(not(len(glob(config.source_pattern, recursive=True)) > 0),
                     'No files matching pattern %s' % config.source_pattern),
             _v_wrap(not config.working_directory,
                     'Working dir blank'),

@@ -23,7 +23,7 @@ class Project():
         self.project = project
         self.workflow = Workflow()
         self.async = AsyncWorkflowHelper()
-        self.monitor = FilePatternMonitor(pattern)
+        self.monitor = FilePatternMonitor(pattern, recursive=True)
         self.paths = {
                 'local_root': '/tmp/' + str(project),
                 'storage_root': '/mnt/nas/' + str(project),
@@ -32,6 +32,10 @@ class Project():
                 }
         self._ensure_root_directories()
         self.frames = frames
+        if self.frames > 1:
+            self._ensure_directory(str(
+                pathlib.Path(self.paths['local_root']).joinpath(
+                pathlib.Path('stack'))))
         self.workflow.MIN_IMPORT_INTERVAL = \
             self.workflow.MIN_IMPORT_INTERVAL / self.frames
 
@@ -160,7 +164,10 @@ class Workflow(Machine):
     def get_model(self, key):
         models = [model for model in self.models[1:]
                   if model.files['original'] == key]
-        return models[0] if models else None
+        if models:
+            return models[0]
+        else:
+            raise KeyError
 
 
 class WorkflowItem():
@@ -266,10 +273,15 @@ class WorkflowItem():
             self.async.create_task(stack_files(pths,
                                                self.files['original']),
                                    done_cb=self._stacking_complete)
-        else:
-            stack_key = self.files['local_original'].name[:-2]
-            stack_path = self.files['local_original'].with_name(stack_key)
+        elif 'local_unstacked' not in self.files:
+            stack_key = self.files['local_original'].stem[:-2] +\
+                self.files['local_original'].suffix
+            stack_path = self.files['local_original'].parent.joinpath(
+                pathlib.Path('stack')).joinpath(
+                pathlib.Path(stack_key))
             model = WorkflowItem(stack_path, self.workflow, self.project)
+            model.files['local_original'] = stack_path
+            model.files['local_stack'] = model.files['local_original']
             try:
                 model = self.workflow.get_model(stack_path)
             except KeyError:
@@ -279,11 +291,12 @@ class WorkflowItem():
             except KeyError:
                 model.files['local_unstacked'] = [self]
             model.stack()
+        else:
+            pass
+            #Only stack models should get here. They should not stack directly.
 
     def _stacking_complete(self, fut):
-        if fut.result() == 0:
-            [x.clean() for x in self.files['local_unstacked']]
-            del self.files['local_unstacked']
+        if not fut.exception():
             self.compress()
         else:
             pass
@@ -383,6 +396,8 @@ class WorkflowItem():
         self._safe_remove_file('local_original')
         self._safe_remove_file('local_converted')
         self._safe_remove_file('original')
+        if 'local_unstacked' in self.files:
+            [x.clean() for x in self.files['local_unstacked']]
         self.finalize()
 
     def _safe_remove_file(self, key):
