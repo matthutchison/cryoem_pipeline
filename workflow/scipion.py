@@ -79,7 +79,7 @@ class Config():
                             config.working_directory,
                             config.project_name))
         imp['filesPattern'] = ('stack/*.mrc' if config.frames_to_stack > 1
-                               else '*.mrc*')
+                               else '*.mrc')
         imp['magnification'] = (((config.physical_pixel_size * .000001) /
                                 (config.image_pixel_size * .0000000001)) /
                                 (2 if config.super_resolution else 1))
