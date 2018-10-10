@@ -3,10 +3,11 @@ import time
 
 
 class FilePatternMonitor():
-    """Async infinite generator for listing new files matching a pattern
+    """Async infinite generator, `await` returns new files matching pattern
 
-    Strictly monitors only the *addition* of files. Anything removed from the
-        directory is not tracked. Anything removed and then re-added will be
+    Strictly monitors only the *addition* of files. Each await returns the
+        files added since the previous await. Anything removed from the
+        directory is not reported. Anything removed and then re-added will be
         reported again.
 
     Keyword arguments:
