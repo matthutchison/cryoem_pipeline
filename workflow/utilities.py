@@ -3,6 +3,7 @@ import errno
 import logging
 import os
 import pathlib
+from subprocess import CalledProcessError
 
 
 logger = logging.getLogger(__name__)
@@ -120,6 +121,28 @@ async def globus_transfer(src_endpoint_spec, dest_endpoint_spec, *args):
     '''
     cmd = ['globus', 'transfer', src_endpoint_spec, dest_endpoint_spec, *args]
     return await _wait_subprocess_exec(cmd)
+
+
+async def globus_endpoint_get_remaining_activation(endpoint):
+    '''Check the remaining activation time (seconds) on an endpoint.
+
+    Endpoint should be provided as a uuid.
+
+    Returns the remaining activation time (seconds) on a specified endpoint.
+    The following values are possible:
+        -1: the endpoint is always active and does not require activation
+        0: the endpoint is inactive and requires activation
+        1 or higher: the endpoint is active for this many more seconds and
+            will require activation after this time period.
+
+    Raises subprocess.CalledProcessError if the process outputs stderr
+    '''
+    cmd = ['globus', 'endpoint', 'is-activated', '--jmespath',
+           'expires_in', endpoint]
+    stdout, stderr = await _communicate_subprocess_exec(cmd)
+    if stderr:
+        raise CalledProcessError(2, cmd, output=stdout, stderr=stderr)
+    return int(stdout)
 
 
 async def create_scipion_project(project_name, config_path):
