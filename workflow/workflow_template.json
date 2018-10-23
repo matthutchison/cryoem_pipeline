@@ -55,7 +55,7 @@
         "doSaveMovie": false,
         "doSaveUnweightedMic": true,
         "extraParams": "",
-        "extraParams2": "-RotGain 3",
+        "extraParams2": "",
         "gpuMsg": "True",
         "group": 1,
         "hostName": "localhost",
