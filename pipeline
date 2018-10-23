@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from workflow.workflow import Project
-from workflow.scipion import Config
+from workflow.scipion import ScipionConfig, SystemConfig
 import argparse
 import logging
 import os
@@ -67,9 +67,10 @@ def _parse_arguments():
 if __name__ == '__main__':
     args = _parse_arguments()
     _check_applications()
-    config = Config(**vars(args))
-    config.generate_config()
-    project_name = config.project_name or args.project
+    system_config = SystemConfig(**vars(args))
+    scipion_config = ScipionConfig(**vars(args))
+    scipion_config.generate_config()
+    project_name = scipion_config.project_name
     logging.basicConfig(
         level=getattr(logging, args.debug) if args.debug else logging.INFO,
         filename=args.log_file or '/mnt/nas/pipeline/'+project_name+'.log')
@@ -78,12 +79,12 @@ if __name__ == '__main__':
     if os.fork():
         sys.exit()
     project = Project(project=project_name,
-                      pattern=config.source_pattern or args.src_pattern,
-                      frames=config.frames_to_stack or args.frames or 1,
+                      pattern=scipion_config.source_pattern,
+                      frames=scipion_config.frames_to_stack,
                       scipion_config=(None if args.no_scipion
-                                      else config.scipion_config_path),
+                                      else scipion_config.scipion_config_path),
                       globus_root=args.dst_directory)
     logger.info('Parameters')
-    for val in vars(config):
-        logger.info(': '.join((val, str(getattr(config, val)))))
+    for val in vars(scipion_config):
+        logger.info(': '.join((val, str(getattr(scipion_config, val)))))
     project.start()

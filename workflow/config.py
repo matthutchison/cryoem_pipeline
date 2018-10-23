@@ -8,14 +8,43 @@ import sys
 APPLICATION_PATH = os.path.realpath(sys.path[0])
 
 
-class Config():
+class BaseConfig():
+    def __init__(self, **kwargs):
+        self._set_keyword_values(**kwargs)
+
+    def _set_keyword_values(self, **kwargs):
+        pass
+
+
+class SystemConfig(BaseConfig):
+    '''Container for system configuration values
+    '''
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def _set_keyword_values(self, **kwargs):
+        self.working_directory = kwargs.get('working_directory')
+
+    def get_config_values(self):
+        self._get_config_values(self)
+
+    @staticmethod
+    def _get_config_values(config):
+        config.working_directory = (
+            config.working_directory or
+            '/tmp')
+
+
+class ScipionConfig(BaseConfig):
     '''Container for project configuration values
     '''
 
     def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def _set_keyword_values(self, **kwargs):
         self.project_name = kwargs.get('project')
         self.source_pattern = kwargs.get('src_pattern')
-        self.working_directory = kwargs.get('working_directory')
         self.path_to_gainref = kwargs.get('path_to_gainref')
         self.frames_to_stack = kwargs.get('frames')
         self.physical_pixel_size = kwargs.get('physical_pixel')
@@ -30,7 +59,7 @@ class Config():
     def generate_config(self):
         self.get_config_values()
         if not self.validate_config():
-            sys.exit('Configuration validation failed.')
+            sys.exit('Scipion configuration validation failed.')
         self.load_template(
             '%s/workflow/workflow_template.json' %
             APPLICATION_PATH)
@@ -117,9 +146,6 @@ class Config():
         config.source_pattern = (
             config.source_pattern or
             input('Pattern to match files for import (ex /path/to/*.mrc): '))
-        config.working_directory = (
-            config.working_directory or
-            '/tmp')
         config.frames_to_stack = int(
             config.frames_to_stack or
             input('Frames to stack (1 for prestacked): '))
