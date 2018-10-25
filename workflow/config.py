@@ -13,7 +13,7 @@ class BaseConfig():
         self._set_keyword_values(**kwargs)
 
     def _set_keyword_values(self, **kwargs):
-        pass
+        raise NotImplementedError
 
 
 class SystemConfig(BaseConfig):
@@ -24,6 +24,12 @@ class SystemConfig(BaseConfig):
 
     def _set_keyword_values(self, **kwargs):
         self.working_directory = kwargs.get('working_directory')
+        self.src_globus_id = kwargs.get('src_endpoint_id')
+        self.src_globus_path = kwargs.get('src_endpoint_path')
+        self.dest_globus_id = kwargs.get('dest_endpoint_id')
+        self.dest_globus_path = kwargs.get('dest_endpoint_path')
+        self.logging_path = kwargs.get('log_file')
+        self.default_template = kwargs.get('default_scipion_template_path')
 
     def get_config_values(self):
         self._get_config_values(self)
@@ -32,7 +38,32 @@ class SystemConfig(BaseConfig):
     def _get_config_values(config):
         config.working_directory = (
             config.working_directory or
-            '/tmp')
+            input('Working directory: '))
+        config.src_globus_id = (
+            config.src_globus_id or
+            input('Source globus endpoint ID: '))
+        config.src_globus_path = (
+            config.src_globus_path or
+            input('Source globus path: '))
+        config.dest_globus_id = (
+            config.dest_globus_id or
+            input('Destination globus endpoint ID: '))
+        config.dest_globus_path = (
+            config.dest_globus_path or
+            input('Destination globus path: '))
+        config.logging_path = (
+            config.logging_path or
+            input('Logging path: '))
+        config.default_template = (
+            config.default_template or
+            input('Path to default scipion template: '))
+
+    def validate_config(self):
+        self._validate_config(self)
+
+    @staticmethod
+    def _validate_config(config):
+        NotImplementedError
 
 
 class ScipionConfig(BaseConfig):
