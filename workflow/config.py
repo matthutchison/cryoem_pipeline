@@ -1,4 +1,5 @@
 from glob import glob
+from uuid import UUID
 import errno
 import json
 import os
@@ -14,6 +15,14 @@ class BaseConfig():
 
     def _set_keyword_values(self, **kwargs):
         raise NotImplementedError
+
+    @staticmethod
+    def _v_wrap(test, msg):
+        if test:
+            print(msg, file=sys.stderr)
+            return False
+        else:
+            return True
 
 
 class SystemConfig(BaseConfig):
@@ -33,6 +42,7 @@ class SystemConfig(BaseConfig):
 
     def get_config_values(self):
         self._get_config_values(self)
+        self.validate_config()
 
     @staticmethod
     def _get_config_values(config):
@@ -44,13 +54,15 @@ class SystemConfig(BaseConfig):
             input('Source globus endpoint ID: '))
         config.src_globus_path = (
             config.src_globus_path or
-            input('Source globus path: '))
+            input('Source globus path: ') or
+            '/')
         config.dest_globus_id = (
             config.dest_globus_id or
             input('Destination globus endpoint ID: '))
         config.dest_globus_path = (
             config.dest_globus_path or
-            input('Destination globus path: '))
+            input('Destination globus path: ') or
+            '/')
         config.logging_path = (
             config.logging_path or
             input('Logging path: '))
@@ -63,7 +75,25 @@ class SystemConfig(BaseConfig):
 
     @staticmethod
     def _validate_config(config):
-        NotImplementedError
+        _v_wrap = BaseConfig._v_wrap
+        return (all([
+            _v_wrap(not config.working_directory,
+                    'Working dir blank'),
+            _v_wrap(not pathlib.Path(config.working_directory).exists(),
+                    'Work dir %s does not exist' % config.working_directory),
+            _v_wrap(not config.logging_path,
+                    'Working dir blank'),
+            _v_wrap(not pathlib.Path(config.logging_path).exists(),
+                    'Work dir %s does not exist' % config.logging_path),
+            _v_wrap(not config.default_template,
+                    'Working dir blank'),
+            _v_wrap(not pathlib.Path(config.default_template).exists(),
+                    'Work dir %s does not exist' % config.working_directory),
+            _v_wrap(not UUID(config.dest_globus_id),
+                    'No Globus destination ID'),
+            _v_wrap(not UUID(config.src_globus_id),
+                    'No Globus source ID'),
+        ]))
 
 
 class ScipionConfig(BaseConfig):
@@ -228,12 +258,7 @@ class ScipionConfig(BaseConfig):
         choices. File path checks are more firm, making sure that things like
         the gain reference and target directories exist.
         '''
-        def _v_wrap(test, msg):
-            if test:
-                print(msg, file=sys.stderr)
-                return False
-            else:
-                return True
+        _v_wrap = BaseConfig._v_wrap
         return(all([
             _v_wrap(not config.project_name,
                     'Project name blank'),
@@ -245,10 +270,6 @@ class ScipionConfig(BaseConfig):
                     'Source pattern is blank'),
             _v_wrap(not(len(glob(config.source_pattern, recursive=True)) > 0),
                     'No files matching pattern %s' % config.source_pattern),
-            _v_wrap(not config.working_directory,
-                    'Working dir blank'),
-            _v_wrap(not pathlib.Path(config.working_directory).exists(),
-                    'Work dir %s does not exist' % config.working_directory),
             _v_wrap(not config.frames_to_stack > 0,
                     'Frames to stack out of range 1-100'),
             _v_wrap(not config.frames_to_stack < 100,
