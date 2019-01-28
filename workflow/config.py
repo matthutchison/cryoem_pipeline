@@ -1,12 +1,14 @@
 from glob import glob
 from uuid import UUID
 import errno
+import logging
 import json
 import os
 import pathlib
 import sys
 
 APPLICATION_PATH = os.path.realpath(sys.path[0])
+logger = logging.getLogger(__name__)
 
 
 class BaseConfig():
@@ -311,3 +313,88 @@ class ScipionConfig(BaseConfig):
                     select a unique project name.' %
                     config.scipion_config_path),
         ]))
+
+# TODO: commandline specs, prompting
+# TODO: validators
+
+
+class ConfigOption():
+    '''Container class for configuration options.
+
+    Properties:
+        validators: a list of callable validators, each accepting self as
+                  the single argument. Each should return True if valid and
+                  False if invalid.
+        name: the name of the option
+        value: the value of the option
+    '''
+
+    def __init__(self, name, value, validators):
+        self.validators = [] if not validators else validators
+        self.name = name
+        self.value = value
+
+    def is_valid(self):
+        return all((func(self) for func in self.validators))
+
+
+class Config():
+    '''Pipeline configuration for the current run.
+
+    Must contain all of the appropriate user-defined and system values needed
+    for the application to run.  Where those are can be distributed amongst
+    files or initially input on the command line, but will be centralized in
+    this configuration and then saved out to a file which can be reloaded
+    during the run to adjust values on the fly.
+
+    '''
+
+    def __init__(self):
+        self.config_options = dict()
+
+    def load(self, paths):
+        '''Load configuration files and merge the dictionaries in order.
+
+        In a list of dicts [x, y, z], the values loaded from config z will
+        override the values from configs x and y.
+        '''
+        if isinstance(paths, str):
+            paths = [paths]
+        for path in paths:
+            conf = self._load_config_file(path)
+            self.config_options = {**self.config_options, **conf}
+
+    def reload(self):
+        if not os.path.exists(self.path):
+            raise FileNotFoundError(
+                errno.ENOENT,
+                os.strerror(errno.ENOENT),
+                self.path)
+        config = self._load_config_file(self.path)
+        self.config_options = config
+
+    @staticmethod
+    def _load_config_file(path):
+        if not os.path.exists(path):
+            raise FileNotFoundError(
+                errno.ENOENT,
+                os.strerror(errno.ENOENT),
+                path)
+        with open(path, mode='r', encoding='utf8') as f:
+            try:
+                config = json.loads(f.read())
+            except json.JSONDecodeError as jde:
+                logger.warning('Could not load config file\n%s' % jde)
+        return config
+
+    def save(self, force=False):
+        if os.path.exists(self.path) and not force:
+            f = input('Config save file %s exists, overwrite (y/n)? ' %
+                      self.path)
+            if len(f) > 0 and f[0] in ['y', 'Y']:
+                force = True
+        with open(self.path, mode='w' if force else 'x', encoding='utf8') as f:
+            f.write(json.dumps(self.config_options))
+
+    def validate_all(self):
+        return all((o.is_valid() for o in self.config_options.values))
