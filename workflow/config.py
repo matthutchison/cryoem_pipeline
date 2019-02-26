@@ -316,6 +316,7 @@ class ScipionConfig(BaseConfig):
 
 # TODO: commandline specs, prompting
 # TODO: validators
+# TODO: actually use it
 
 
 class ConfigOption():
@@ -329,7 +330,7 @@ class ConfigOption():
         value: the value of the option
     '''
 
-    def __init__(self, name, value, validators):
+    def __init__(self, name, value, validators=None):
         self.validators = [] if not validators else validators
         self.name = name
         self.value = value
@@ -351,6 +352,17 @@ class Config():
 
     def __init__(self):
         self.config_options = dict()
+        self.path = None
+
+    def add(self, option):
+        if not isinstance(option, ConfigOption):
+            logger.warning('Attempted to add %s as a config option. Wrong type'
+                           % option)
+        elif option.name not in self.config_options:
+            self.config_options[option.name] = option
+        else:
+            self.config_options[option.name].value = option.value
+            self.config_options[option.name].validators = option.validators
 
     def load(self, paths):
         '''Load configuration files and merge the dictionaries in order.
@@ -397,4 +409,4 @@ class Config():
             f.write(json.dumps(self.config_options))
 
     def validate_all(self):
-        return all((o.is_valid() for o in self.config_options.values))
+        return all((o.is_valid() for o in self.config_options.values()))
