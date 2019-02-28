@@ -50,3 +50,15 @@ class ConfigTests(unittest.TestCase):
                                      validators=validators))
         self.assertFalse(config.config_options['test1'].is_valid())
         self.assertFalse(config.validate_all())
+
+    def test_load_single_and_multiple_is_consistent(self):
+        config = conf.Config()
+        config.load('workflow/base_system_config.json')
+        config.load(['workflow/base_system_config.json',
+                    'workflow/base_system_config.json'])
+
+    def test_load_works_with_path_objects(self):
+        config = conf.Config()
+        config.load(pathlib.Path('workflow/base_system_config.json'))
+        config.load([pathlib.Path('workflow/base_system_config.json'),
+                     pathlib.Path('workflow/base_system_config.json')])

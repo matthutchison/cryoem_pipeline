@@ -11,23 +11,95 @@ APPLICATION_PATH = os.path.realpath(sys.path[0])
 logger = logging.getLogger(__name__)
 
 
-class BaseConfig():
-    def __init__(self, **kwargs):
-        self._set_keyword_values(**kwargs)
+class ConfigOption():
+    '''Container class for configuration options.
 
-    def _set_keyword_values(self, **kwargs):
-        raise NotImplementedError
+    Properties:
+        validators: a list of callable validators, each accepting self as
+                  the single argument. Each should return True if valid and
+                  False if invalid.
+        name: the name of the option
+        value: the value of the option
+    '''
+
+    def __init__(self, name, value, validators=None):
+        self.validators = [] if not validators else validators
+        self.name = name
+        self.value = value
+
+    def is_valid(self):
+        return all((func(self) for func in self.validators))
+
+
+class Config():
+    '''Pipeline configuration for the current run.
+
+    Must contain all of the appropriate user-defined and system values needed
+    for the application to run.  Where those are can be distributed amongst
+    files or initially input on the command line, but will be centralized in
+    this configuration and then saved out to a file which can be reloaded
+    during the run to adjust values on the fly.
+
+    '''
+
+    def __init__(self):
+        self.config_options = dict()
+        self.path = None
+
+    def add(self, option):
+        if not isinstance(option, ConfigOption):
+            logger.warning('Attempted to add %s as a config option. Wrong type'
+                           % option)
+        elif option.name not in self.config_options:
+            self.config_options[option.name] = option
+        else:
+            self.config_options[option.name].value = option.value
+            self.config_options[option.name].validators = option.validators
+
+    def load(self, paths):
+        '''Load configuration files and merge the dictionaries in order.
+
+        In a list of dicts [x, y, z], the values loaded from config z will
+        override the values from configs x and y.
+        '''
+        if isinstance(paths, str) or isinstance(paths, pathlib.PurePath):
+            paths = [paths]
+        for path in paths:
+            conf = self._load_config_file(path)
+            self.config_options = {**self.config_options, **conf}
+
+    def reload(self):
+        config = self._load_config_file(self.path)
+        self.config_options = config
 
     @staticmethod
-    def _v_wrap(test, msg):
-        if test:
-            print(msg, file=sys.stderr)
-            return False
-        else:
-            return True
+    def _load_config_file(path):
+        path = str(path)
+        if not os.path.exists(path):
+            raise FileNotFoundError(
+                errno.ENOENT,
+                os.strerror(errno.ENOENT),
+                path)
+        with open(path, mode='r', encoding='utf8') as f:
+            try:
+                config = json.loads(f.read())
+            except json.JSONDecodeError as jde:
+                logger.warning('Could not load config file\n%s' % jde)
+        return config
 
+    def save(self, force=False):
+        if os.path.exists(self.path) and not force:
+            f = input('Config save file %s exists, overwrite (y/n)? ' %
+                      self.path)
+            if len(f) > 0 and f[0] in ['y', 'Y']:
+                force = True
+        with open(self.path, mode='w' if force else 'x', encoding='utf8') as f:
+            f.write(json.dumps(self.config_options))
 
-class SystemConfig(BaseConfig):
+    def validate_all(self):
+        return all((o.is_valid() for o in self.config_options.values()))
+
+class SystemConfig():
     '''Container for system configuration values
     '''
     def __init__(self, **kwargs):
@@ -77,7 +149,7 @@ class SystemConfig(BaseConfig):
 
     @staticmethod
     def _validate_config(config):
-        _v_wrap = BaseConfig._v_wrap
+        _v_wrap = lambda x: x
         return (all([
             _v_wrap(not config.working_directory,
                     'Working dir blank'),
@@ -98,7 +170,7 @@ class SystemConfig(BaseConfig):
         ]))
 
 
-class ScipionConfig(BaseConfig):
+class ScipionConfig():
     '''Container for project configuration values
     '''
 
@@ -260,7 +332,7 @@ class ScipionConfig(BaseConfig):
         choices. File path checks are more firm, making sure that things like
         the gain reference and target directories exist.
         '''
-        _v_wrap = BaseConfig._v_wrap
+        _v_wrap = lambda x: x
         return(all([
             _v_wrap(not config.project_name,
                     'Project name blank'),
@@ -317,96 +389,3 @@ class ScipionConfig(BaseConfig):
 # TODO: commandline specs, prompting
 # TODO: validators
 # TODO: actually use it
-
-
-class ConfigOption():
-    '''Container class for configuration options.
-
-    Properties:
-        validators: a list of callable validators, each accepting self as
-                  the single argument. Each should return True if valid and
-                  False if invalid.
-        name: the name of the option
-        value: the value of the option
-    '''
-
-    def __init__(self, name, value, validators=None):
-        self.validators = [] if not validators else validators
-        self.name = name
-        self.value = value
-
-    def is_valid(self):
-        return all((func(self) for func in self.validators))
-
-
-class Config():
-    '''Pipeline configuration for the current run.
-
-    Must contain all of the appropriate user-defined and system values needed
-    for the application to run.  Where those are can be distributed amongst
-    files or initially input on the command line, but will be centralized in
-    this configuration and then saved out to a file which can be reloaded
-    during the run to adjust values on the fly.
-
-    '''
-
-    def __init__(self):
-        self.config_options = dict()
-        self.path = None
-
-    def add(self, option):
-        if not isinstance(option, ConfigOption):
-            logger.warning('Attempted to add %s as a config option. Wrong type'
-                           % option)
-        elif option.name not in self.config_options:
-            self.config_options[option.name] = option
-        else:
-            self.config_options[option.name].value = option.value
-            self.config_options[option.name].validators = option.validators
-
-    def load(self, paths):
-        '''Load configuration files and merge the dictionaries in order.
-
-        In a list of dicts [x, y, z], the values loaded from config z will
-        override the values from configs x and y.
-        '''
-        if isinstance(paths, str):
-            paths = [paths]
-        for path in paths:
-            conf = self._load_config_file(path)
-            self.config_options = {**self.config_options, **conf}
-
-    def reload(self):
-        if not os.path.exists(self.path):
-            raise FileNotFoundError(
-                errno.ENOENT,
-                os.strerror(errno.ENOENT),
-                self.path)
-        config = self._load_config_file(self.path)
-        self.config_options = config
-
-    @staticmethod
-    def _load_config_file(path):
-        if not os.path.exists(path):
-            raise FileNotFoundError(
-                errno.ENOENT,
-                os.strerror(errno.ENOENT),
-                path)
-        with open(path, mode='r', encoding='utf8') as f:
-            try:
-                config = json.loads(f.read())
-            except json.JSONDecodeError as jde:
-                logger.warning('Could not load config file\n%s' % jde)
-        return config
-
-    def save(self, force=False):
-        if os.path.exists(self.path) and not force:
-            f = input('Config save file %s exists, overwrite (y/n)? ' %
-                      self.path)
-            if len(f) > 0 and f[0] in ['y', 'Y']:
-                force = True
-        with open(self.path, mode='w' if force else 'x', encoding='utf8') as f:
-            f.write(json.dumps(self.config_options))
-
-    def validate_all(self):
-        return all((o.is_valid() for o in self.config_options.values()))
