@@ -22,6 +22,10 @@ def _check_applications():
         sys.exit('This application requires scipion be installed. Exiting')
     if which('imod') is None:
         sys.exit('This application requires imod be installed. Exiting')
+    try:
+        import transitions  # noqa: F401
+    except ImportError:
+        sys.exit('The python module "transitions" is not installed. Exiting')
 
 
 def _parse_arguments():
