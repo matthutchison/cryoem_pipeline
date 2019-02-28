@@ -11,26 +11,6 @@ APPLICATION_PATH = os.path.realpath(sys.path[0])
 logger = logging.getLogger(__name__)
 
 
-class ConfigOption():
-    '''Container class for configuration options.
-
-    Properties:
-        validators: a list of callable validators, each accepting self as
-                  the single argument. Each should return True if valid and
-                  False if invalid.
-        name: the name of the option
-        value: the value of the option
-    '''
-
-    def __init__(self, name, value, validators=None):
-        self.validators = [] if not validators else validators
-        self.name = name
-        self.value = value
-
-    def is_valid(self):
-        return all((func(self) for func in self.validators))
-
-
 class Config():
     '''Pipeline configuration for the current run.
 
@@ -44,17 +24,12 @@ class Config():
 
     def __init__(self):
         self.config_options = dict()
+        self.validators = dict()
         self.path = None
 
-    def add(self, option):
-        if not isinstance(option, ConfigOption):
-            logger.warning('Attempted to add %s as a config option. Wrong type'
-                           % option)
-        elif option.name not in self.config_options:
-            self.config_options[option.name] = option
-        else:
-            self.config_options[option.name].value = option.value
-            self.config_options[option.name].validators = option.validators
+    def __str__(self):
+        from pprint import pformat
+        return pformat(self.config_options)
 
     def load(self, paths):
         '''Load configuration files and merge the dictionaries in order.
@@ -96,8 +71,15 @@ class Config():
         with open(self.path, mode='w' if force else 'x', encoding='utf8') as f:
             f.write(json.dumps(self.config_options))
 
+    def validate(self, key, validators):
+        try:
+            return all((v(self.config_options[key]) for v in validators))
+        except KeyError:
+            logger.info('Did not validate %s, config option not found' % key)
+
     def validate_all(self):
-        return all((o.is_valid() for o in self.config_options.values()))
+        return all((self.validate(k, v) for k, v in self.validators.items()))
+
 
 class SystemConfig():
     '''Container for system configuration values

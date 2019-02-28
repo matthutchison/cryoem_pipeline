@@ -35,20 +35,18 @@ class ConfigTests(unittest.TestCase):
 
     def test_validation_good_succeeds(self):
         config = conf.Config()
-        validators = [lambda x: x.value == 'test2', lambda x: True]
-        config.add(conf.ConfigOption('test1',
-                                     'test2',
-                                     validators=validators))
-        self.assertTrue(config.config_options['test1'].is_valid())
+        validators = [lambda x: x == 'test2', lambda x: True]
+        config.config_options['test1'] = 'test2'
+        self.assertTrue(config.validate('test1', validators))
+        config.validators['test1'] = validators
         self.assertTrue(config.validate_all())
 
     def test_validation_bad_fails(self):
         config = conf.Config()
-        validators = [lambda x: x.value == 'test2', lambda x: False]
-        config.add(conf.ConfigOption('test1',
-                                     'test2',
-                                     validators=validators))
-        self.assertFalse(config.config_options['test1'].is_valid())
+        validators = [lambda x: x == 'test2', lambda x: False]
+        config.config_options['test1'] = 'test2'
+        self.assertFalse(config.validate('test1', validators))
+        config.validators['test1'] = validators
         self.assertFalse(config.validate_all())
 
     def test_load_single_and_multiple_is_consistent(self):
