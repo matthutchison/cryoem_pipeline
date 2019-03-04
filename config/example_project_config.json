@@ -1,0 +1,13 @@
+{
+    "project_name": null,
+    "source_pattern": null,
+    "gain_reference_path": null,
+    "frames_to_stack": null,
+    "physical_pixel_size": null,
+    "image_pixel_size": null,
+    "super_resolution": null,
+    "ctf_low_resolution": null,
+    "ctf_high_resolution": null,
+    "defocus_search_minimum": null,
+    "defocus_search_maximum": null
+}

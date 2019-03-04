@@ -36,27 +36,29 @@ class ConfigTests(unittest.TestCase):
     def test_validation_good_succeeds(self):
         config = conf.Config()
         validators = [lambda x: x == 'test2', lambda x: True]
+        config.validators.clear()
+        config.validators['test1'] = validators
         config.config_options['test1'] = 'test2'
         self.assertTrue(config.validate('test1', validators))
-        config.validators['test1'] = validators
         self.assertTrue(config.validate_all())
 
     def test_validation_bad_fails(self):
         config = conf.Config()
         validators = [lambda x: x == 'test2', lambda x: False]
+        config.validators.clear()
+        config.validators['test1'] = validators
         config.config_options['test1'] = 'test2'
         self.assertFalse(config.validate('test1', validators))
-        config.validators['test1'] = validators
         self.assertFalse(config.validate_all())
 
     def test_load_single_and_multiple_is_consistent(self):
         config = conf.Config()
-        config.load('workflow/base_system_config.json')
-        config.load(['workflow/base_system_config.json',
-                    'workflow/base_system_config.json'])
+        config.load('config/base_system_config.json')
+        config.load(['config/base_system_config.json',
+                    'config/base_system_config.json'])
 
     def test_load_works_with_path_objects(self):
         config = conf.Config()
-        config.load(pathlib.Path('workflow/base_system_config.json'))
-        config.load([pathlib.Path('workflow/base_system_config.json'),
-                     pathlib.Path('workflow/base_system_config.json')])
+        config.load(pathlib.Path('config/base_system_config.json'))
+        config.load([pathlib.Path('config/base_system_config.json'),
+                     pathlib.Path('config/base_system_config.json')])
