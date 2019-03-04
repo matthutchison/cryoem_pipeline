@@ -268,10 +268,10 @@ class ScipionConfig():
             input('Frames to stack (1 for prestacked): '))
         config.physical_pixel_size = float(
             config.physical_pixel_size or
-            input('Physical pixel size (5?) (um): '))
+            input('Physical pixel size (5?) (µm): '))
         config.image_pixel_size = float(
             config.image_pixel_size or
-            input('Image pixel size (A): '))
+            input('Image pixel size (Å): '))
         _super_res = (
             config.super_resolution or
             input('Are you running super resolution (y/n): '))
@@ -281,16 +281,16 @@ class ScipionConfig():
                                    else False)
         config.ctf_low_res = float(
             config.ctf_low_res or
-            input('CTF search low resolution bound (30?) (A): '))
+            input('CTF search low resolution bound (30?) (Å): '))
         config.ctf_high_res = float(
             config.ctf_high_res or
-            input('CTF search high resolution bound (3?) (A): '))
+            input('CTF search high resolution bound (3?) (Å): '))
         config.defocus_search_min = float(
             config.defocus_search_min or
-            input('Defocus search minimum (.25?) (um): '))
+            input('Defocus search minimum (.25?) (µm): '))
         config.defocus_search_max = float(
             config.defocus_search_max or
-            input('Defocus search maximum (5?) (um): '))
+            input('Defocus search maximum (5?) (µm): '))
         config.scipion_config_path = (
             config.scipion_config_path or
             '/mnt/nas/Scipion/'+config.project_name+'.json')
