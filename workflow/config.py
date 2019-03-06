@@ -54,11 +54,20 @@ class Config():
         for choice in choices:
             self.load(pathlib.Path(APPLICATION_PATH, '/config', choice))
 
+    def prompt_for_unset_values(self):
+        for k, v in self.config_options.items():
+            if v is None:
+                new = input('Set value for %s?: ' % k)
+                if new:
+                    self.config_options[k] = new
+
     def reload(self):
         config = self._load_config_file(self.path)
         self.config_options = config
 
-    def save(self, force=False):
+    def save(self, path=None, force=False):
+        if path:
+            self.path = str(path)
         if os.path.exists(self.path) and not force:
             f = input('Config save file %s exists, overwrite (y/n)? ' %
                       self.path)
@@ -99,23 +108,59 @@ class Config():
                 logger.warning('Could not load config file\n%s' % jde)
         return config
 
-    def save(self, force=False):
-        if os.path.exists(self.path) and not force:
-            f = input('Config save file %s exists, overwrite (y/n)? ' %
-                      self.path)
-            if len(f) > 0 and f[0] in ['y', 'Y']:
-                force = True
-        with open(self.path, mode='w' if force else 'x', encoding='utf8') as f:
-            f.write(json.dumps(self.config_options))
-
-    def validate(self, key, validators):
-        try:
-            return all((v(self.config_options[key]) for v in validators))
-        except KeyError:
-            logger.info('Did not validate %s, config option not found' % key)
-
-    def validate_all(self):
-        return all((self.validate(k, v) for k, v in self.validators.items()))
+    def _get_default_validators(self):
+        return {
+            'system_logger': [
+                lambda v: bool(v),
+                lambda v: pathlib.Path(v).exists()],
+            'working_directory': [
+                lambda v: bool(v),
+                lambda v: pathlib.Path(v).exists()],
+            'scipion_template_path': [
+                lambda v: bool(v),
+                lambda v: pathlib.Path(v).exists()],
+            'run_config_directory': [
+                lambda v: bool(v),
+                lambda v: pathlib.Path(v).exists()],
+            'globus_source_endpoint_id': [
+                lambda v: v is None or bool(UUID(v))],
+            'globus_destination_endpoint_id': [
+                lambda v: v is None or bool(UUID(v))],
+            'globus_source_endpoint_path': [
+                lambda v: v is None or bool(UUID(v))],
+            'globus_destination_endpoint_path': [
+                lambda v: v is None or bool(UUID(v))],
+            'project_name': [
+                lambda v: bool(v)],
+            'gain_reference_path': [
+                lambda v: bool(v),
+                lambda v: pathlib.Path(v).exists()],
+            'source_pattern': [
+                lambda v: bool(v),
+                lambda v: len(glob(v), recursive=True) > 0],
+            'frames_to_stack': [
+                lambda v: bool(v),
+                lambda v: 0 < v < 100],
+            'physical_pixel_size': [
+                lambda v: bool(v),
+                lambda v: 1 < v < 50],
+            'image_pixel_size': [
+                lambda v: bool(v),
+                lambda v: 0.1 < v < 5],
+            'super_resolution': [
+                lambda v: v in (True, False)],
+            'ctf_low_resolution': [
+                lambda v: 1 < v < 50],
+            'ctf_high_resolution': [
+                lambda v: 1 < v < 50],
+            'defocus_search_minimum': [
+                lambda v: 0 < v < 10],
+            'defocus_search_maximum': [
+                lambda v: 0 < v < 100],
+            'scipion_run_template_path': [
+                lambda v: bool(v),
+                lambda v: not pathlib.Path(v).exists()]
+        }
 
 
 class SystemConfig():

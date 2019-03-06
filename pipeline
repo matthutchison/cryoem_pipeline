@@ -56,6 +56,11 @@ if __name__ == '__main__':
     config = Config()
     config.load(pathlib.Path('config/default/base_system_config.json'))
     config.prompt_user_configs()
+    config.prompt_for_unset_values()
+    config.validate_all()
+    config.save(
+        path=pathlib.Path(config.config_options.get('run_config_directory'),
+                          config.config_options['project_name'] + '.json'))
     template = ScipionTemplate(config)
     template.generate_config()
     logging.basicConfig(
