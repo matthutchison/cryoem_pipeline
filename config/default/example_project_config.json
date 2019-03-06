@@ -9,5 +9,6 @@
     "ctf_low_resolution": null,
     "ctf_high_resolution": null,
     "defocus_search_minimum": null,
-    "defocus_search_maximum": null
+    "defocus_search_maximum": null,
+    "minimum_import_interval": 40
 }

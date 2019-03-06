@@ -53,12 +53,12 @@ class ConfigTests(unittest.TestCase):
 
     def test_load_single_and_multiple_is_consistent(self):
         config = conf.Config()
-        config.load('config/base_system_config.json')
-        config.load(['config/base_system_config.json',
-                    'config/base_system_config.json'])
+        config.load('config/default/base_system_config.json')
+        config.load(['config/default/base_system_config.json',
+                    'config/default/base_system_config.json'])
 
     def test_load_works_with_path_objects(self):
         config = conf.Config()
-        config.load(pathlib.Path('config/base_system_config.json'))
-        config.load([pathlib.Path('config/base_system_config.json'),
-                     pathlib.Path('config/base_system_config.json')])
+        config.load(pathlib.Path('config/default/base_system_config.json'))
+        config.load([pathlib.Path('config/default/base_system_config.json'),
+                     pathlib.Path('config/default/base_system_config.json')])

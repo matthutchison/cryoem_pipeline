@@ -10,9 +10,6 @@ import os
 import pathlib
 import time
 
-GLOBUS_ROOT = '/mnt/NCEF-CryoEM/'
-ATC_GLOBUS_ENDPOINT = '67dace28-311f-11e8-b8f8-0ac6873fc732'
-MOAB_GLOBUS_ENDPOINT = 'dabdccc3-6d04-11e5-ba46-22000b92c6ec'
 logger = logging.getLogger(__name__)
 
 
@@ -20,28 +17,40 @@ class Project():
     '''Overarching project controller
     '''
 
-    def __init__(self, project, pattern, frames=1, scipion_config=None,
-                 globus_root=None):
-        self.project = project
+    def __init__(self, config):
+        self.config = config
+        self.project = self.config.config_options['project_name']
         self.workflow = Workflow()
         self.awh = AsyncWorkflowHelper()
-        self.monitor = FilePatternMonitor(pattern, recursive=True)
-        if globus_root is None:
-            globus_root = GLOBUS_ROOT
-        self.paths = {
-                'local_root': '/tmp/' + str(project),
-                'storage_root': '/mnt/nas/' + str(project),
-                'globus_root': globus_root.rstrip('/') + '/' + str(project),
-                'scipion_config': scipion_config
-                }
+        self.monitor = FilePatternMonitor(
+            self.config.config_options['source_pattern'], recursive=True)
+        self._set_local_vars()
         self._ensure_root_directories()
-        self.frames = frames
         if self.frames > 1:
             self._ensure_directory(str(
                 pathlib.Path(self.paths['local_root']).joinpath(
                     pathlib.Path('stack'))))
         self.workflow.MIN_IMPORT_INTERVAL = \
             self.workflow.MIN_IMPORT_INTERVAL / self.frames
+
+    def _reload_local_vars(self):
+        self.config.reload()
+        c = self.config.config_options
+        self.paths = {
+            'local_root': str(pathlib.Path(c.get('working_directory'),
+                                           c.get('project_name'))),
+            'storage_root': str(pathlib.Path(c.get('storage_directory'),
+                                             c.get('project_name'))),
+            'globus_root': (c.get('globus_destination_endpoint_path') +
+                            c.get('project_name')),
+            'scipion_template': str(pathlib.Path(c.get('run_config_directory'),
+                                                 c.get('projecft_name')))
+        }
+        self.frames = c.get('frames_to_stack')
+        self.workflow.MIN_IMPORT_INTERVAL = \
+            c.get('minimum_import_interval') / self.frames
+        self.SRC_GLOBUS_ENDPOINT = c.get('globus_source_endpoint_id')
+        self.DEST_GLOBUS_ENDPOINT = c.get('globus_destination_endpoint_id')
 
     def start(self):
         self._transfer_loop()
@@ -96,8 +105,8 @@ class Project():
             raise KeyError('Project name must not be empty.')
         await asyncio.sleep(pre_wait)
         await globus_transfer(
-            ATC_GLOBUS_ENDPOINT + ':/' + str(self.project),
-            MOAB_GLOBUS_ENDPOINT + ':' + self.paths['globus_root'],
+            self.SRC_GLOBUS_ENDPOINT + ':/' + str(self.project),
+            self.DEST_GLOBUS_ENDPOINT + ':' + self.paths['globus_root'],
             '-s', 'mtime',
             '-r',
             '--preserve-mtime',
@@ -179,7 +188,6 @@ class WorkflowItem():
     '''
 
     def __init__(self, path, workflow, project):
-        self.history = []
         self.files = {'original': pathlib.Path(path)}
         self.project = project
         self.workflow = workflow

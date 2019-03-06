@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from workflow.workflow import Project
-from workflow.config import Config
+from workflow.config import Config, ScipionTemplate
 import argparse
 import logging
 import os
@@ -31,25 +31,10 @@ def _check_applications():
 
 def _parse_arguments():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--project', '-p',
-                        required=False,
-                        type=str,
-                        help='Unique project identifier.')
-    parser.add_argument('--src-pattern', '-s',
-                        required=False,
-                        type=str,
-                        help='A globbing pattern to match files for import and\
-                        processing. Usually matches the files directly output\
-                        by the camera.')
     parser.add_argument('--dst-directory', '-d',
                         required=False,
                         type=str,
                         help='Destination directory for Globus transfer.')
-    parser.add_argument('--frames', '-f',
-                        required=False,
-                        type=int,
-                        help='Set to the number of frames that will need to be\
-                        stacked per-movie. Defaults to 1 (already stacked).')
     parser.add_argument('--no-scipion',
                         required=False,
                         action='store_true',
@@ -61,10 +46,6 @@ def _parse_arguments():
                         type=str,
                         help='Provide a verbosity level like INFO or DEBUG\n\
                         Defaults to the equivalent of --debug INFO')
-    parser.add_argument('--log-file', '-o',
-                        required=False,
-                        type=str,
-                        help='Path to write log file.')
     args = parser.parse_args()
     return args
 
@@ -73,12 +54,10 @@ if __name__ == '__main__':
     args = _parse_arguments()
     _check_applications()
     config = Config()
-    config.load(pathlib.Path('workflow/base_system_config.json'))
-    print(config)
-    system_config = SystemConfig(**vars(args))
-    scipion_config = ScipionConfig(**vars(args))
-    scipion_config.generate_config()
-    project_name = scipion_config.project_name
+    config.load(pathlib.Path('config/default/base_system_config.json'))
+    config.prompt_user_configs()
+    template = ScipionTemplate(config)
+    template.generate_config()
     logging.basicConfig(
         level=getattr(logging, args.debug) if args.debug else logging.INFO,
         filename=args.log_file or '/mnt/nas/pipeline/'+project_name+'.log')
@@ -86,13 +65,8 @@ if __name__ == '__main__':
     logger = logging.getLogger(__name__)
     if os.fork():
         sys.exit()
-    project = Project(project=project_name,
-                      pattern=scipion_config.source_pattern,
-                      frames=scipion_config.frames_to_stack,
-                      scipion_config=(None if args.no_scipion
-                                      else scipion_config.scipion_config_path),
-                      globus_root=args.dst_directory)
+    project = Project(config)
     logger.info('Parameters')
-    for val in vars(scipion_config):
-        logger.info(': '.join((val, str(getattr(scipion_config, val)))))
+    for val in vars(config.config_options):
+        logger.info(': '.join((val, str(getattr(config.config_options, val)))))
     project.start()

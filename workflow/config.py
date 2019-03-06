@@ -24,7 +24,7 @@ class Config():
 
     def __init__(self):
         self.config_options = dict()
-        self.validators = dict()
+        self.validators = self._get_default_validators()
         self.path = None
 
     def __str__(self):
@@ -43,9 +43,46 @@ class Config():
             conf = self._load_config_file(path)
             self.config_options = {**self.config_options, **conf}
 
+    def prompt_user_configs(self):
+        user_configs = [c for c in pathlib.Path(
+                        APPLICATION_PATH, '/config').glob('*.json')]
+        print('Which configurations would you like to load?')
+        print('\n'.join(('(%i) %s' % e for e in enumerate(user_configs))))
+        choices = [user_configs[int(c.trim())] for c in
+                   input('Choices (separate multiple with commas): ')
+                   .split(sep=',')]
+        for choice in choices:
+            self.load(pathlib.Path(APPLICATION_PATH, '/config', choice))
+
     def reload(self):
         config = self._load_config_file(self.path)
         self.config_options = config
+
+    def save(self, force=False):
+        if os.path.exists(self.path) and not force:
+            f = input('Config save file %s exists, overwrite (y/n)? ' %
+                      self.path)
+            if len(f) > 0 and f[0] in ['y', 'Y']:
+                force = True
+        with open(self.path, mode='w' if force else 'x', encoding='utf8') as f:
+            f.write(json.dumps(self.config_options))
+
+    def validate(self, key, validators):
+        '''Validate the configuration option 'key' in self.config_options
+        '''
+        for validator in validators:
+            try:
+                if not validator(self.config_options[key]):
+                    print('Configuration check failed for %s with value %s' %
+                          (key, self.config_options[key]), file=sys.stderr)
+                    return False
+            except KeyError:
+                logger.info('Did not validate %s, config option not found' %
+                            key)
+        return True
+
+    def validate_all(self):
+        return all((self.validate(k, v) for k, v in self.validators.items()))
 
     @staticmethod
     def _load_config_file(path):
@@ -96,90 +133,36 @@ class SystemConfig():
         self.logging_path = kwargs.get('log_file')
         self.default_template = kwargs.get('default_scipion_template_path')
 
-    def get_config_values(self):
-        self._get_config_values(self)
-        self.validate_config()
 
-    @staticmethod
-    def _get_config_values(config):
-        config.working_directory = (
-            config.working_directory or
-            input('Working directory: '))
-        config.src_globus_id = (
-            config.src_globus_id or
-            input('Source globus endpoint ID: '))
-        config.src_globus_path = (
-            config.src_globus_path or
-            input('Source globus path: ') or
-            '/')
-        config.dest_globus_id = (
-            config.dest_globus_id or
-            input('Destination globus endpoint ID: '))
-        config.dest_globus_path = (
-            config.dest_globus_path or
-            input('Destination globus path: ') or
-            '/')
-        config.logging_path = (
-            config.logging_path or
-            input('Logging path: '))
-        config.default_template = (
-            config.default_template or
-            input('Path to default scipion template: '))
-
-    def validate_config(self):
-        self._validate_config(self)
-
-    @staticmethod
-    def _validate_config(config):
-        _v_wrap = lambda x: x
-        return (all([
-            _v_wrap(not config.working_directory,
-                    'Working dir blank'),
-            _v_wrap(not pathlib.Path(config.working_directory).exists(),
-                    'Work dir %s does not exist' % config.working_directory),
-            _v_wrap(not config.logging_path,
-                    'Working dir blank'),
-            _v_wrap(not pathlib.Path(config.logging_path).exists(),
-                    'Work dir %s does not exist' % config.logging_path),
-            _v_wrap(not config.default_template,
-                    'Working dir blank'),
-            _v_wrap(not pathlib.Path(config.default_template).exists(),
-                    'Work dir %s does not exist' % config.working_directory),
-            _v_wrap(not UUID(config.dest_globus_id),
-                    'No Globus destination ID'),
-            _v_wrap(not UUID(config.src_globus_id),
-                    'No Globus source ID'),
-        ]))
-
-
-class ScipionConfig():
+class ScipionTemplate():
     '''Container for project configuration values
     '''
+    def __init__(self, config):
+        if config.validate_all():
+            self.config = config.config_options
+        else:
+            sys.exit('Configuration not validated prior to template generation.\
+                     exiting.')
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def _set_keyword_values(self):
+        self.project_name = self.config.get('project_name')
+        self.source_pattern = self.config.get('source_pattern')
+        self.path_to_gainref = self.config.get('gain_reference_path')
+        self.frames_to_stack = self.config.get('frames_to_stack')
+        self.physical_pixel_size = self.config.get('physical_pixel_size')
+        self.image_pixel_size = self.config.get('image_pixel_size')
+        self.super_resolution = self.config.get('super_resolution')
+        self.ctf_low_res = self.config.get('ctf_low_resolution')
+        self.ctf_high_res = self.config.get('ctf_high_resolution')
+        self.defocus_search_min = self.config.get('defocus_search_minimum')
+        self.defocus_search_max = self.config.get('defocus_search_maximum')
+        self.scipion_config_path = pathlib.Path(
+            self.config.get('run_config_directory'),
+            self.config.get('project_name'))
 
-    def _set_keyword_values(self, **kwargs):
-        self.project_name = kwargs.get('project')
-        self.source_pattern = kwargs.get('src_pattern')
-        self.path_to_gainref = kwargs.get('path_to_gainref')
-        self.frames_to_stack = kwargs.get('frames')
-        self.physical_pixel_size = kwargs.get('physical_pixel')
-        self.image_pixel_size = kwargs.get('image_pixel')
-        self.super_resolution = kwargs.get('super_resolution')
-        self.ctf_low_res = kwargs.get('ctf_low_res')
-        self.ctf_high_res = kwargs.get('ctf_high_res')
-        self.defocus_search_min = kwargs.get('defocus_min')
-        self.defocus_search_max = kwargs.get('defocus_max')
-        self.scipion_config_path = kwargs.get('scipion_output')
-
-    def generate_config(self):
+    def generate_template(self):
         self.get_config_values()
-        if not self.validate_config():
-            sys.exit('Scipion configuration validation failed.')
-        self.load_template(
-            '%s/workflow/workflow_template.json' %
-            APPLICATION_PATH)
+        self.load_template(self.config['scipion_template_path'])
         self.template_insert_values()
         self.write_template(self.scipion_config_path)
 
@@ -293,81 +276,4 @@ class ScipionConfig():
             input('Defocus search maximum (5?) (µm): '))
         config.scipion_config_path = (
             config.scipion_config_path or
-            '/mnt/nas/Scipion/'+config.project_name+'.json')
-
-    def validate_config(self):
-        '''Validate the class configuration.
-        '''
-        return self._validate_config(self)
-
-    @staticmethod
-    def _validate_config(config):
-        '''Validate the provided application configuration.
-
-        This is always intended to be called *before* the Scipion configuration
-        is written and Scipion process started. Failing to do so will result in
-        untested configurations being allowed to kick off scipion processes of
-        unknown validity.
-
-        The numeric validations here are for sanity-check purposes and will
-        not protect the user from making bad but potentially reasonable
-        choices. File path checks are more firm, making sure that things like
-        the gain reference and target directories exist.
-        '''
-        _v_wrap = lambda x: x
-        return(all([
-            _v_wrap(not config.project_name,
-                    'Project name blank'),
-            _v_wrap(not config.path_to_gainref,
-                    'Path to gain ref blank'),
-            _v_wrap(not pathlib.Path(config.path_to_gainref).exists(),
-                    'Path to gain ref does not exist'),
-            _v_wrap(not config.source_pattern,
-                    'Source pattern is blank'),
-            _v_wrap(not(len(glob(config.source_pattern, recursive=True)) > 0),
-                    'No files matching pattern %s' % config.source_pattern),
-            _v_wrap(not config.frames_to_stack > 0,
-                    'Frames to stack out of range 1-100'),
-            _v_wrap(not config.frames_to_stack < 100,
-                    'Frames to stack out of range 1-100'),
-            _v_wrap(not config.physical_pixel_size >= 1,
-                    'Physical pixel size out of range 1-50'),
-            _v_wrap(not config.physical_pixel_size <= 50,
-                    'Physical pixel size out of ramge 1-50'),
-            _v_wrap(not config.image_pixel_size < 5,
-                    'Image pixel size out of range 0.1-5'),
-            _v_wrap(not config.image_pixel_size > 0.1,
-                    'Image pixel size out of range 0.1-5'),
-            _v_wrap(config.super_resolution not in (True, False),
-                    'Super resolution value invalid. Valid are True, False.'),
-            _v_wrap(not config.ctf_low_res < 50,
-                    'CTF low resolution out of range 1-50'),
-            _v_wrap(not config.ctf_low_res > 1,
-                    'CTF low resolution out of range 1-50'),
-            _v_wrap(not config.ctf_high_res < 50,
-                    'CTF high resolution out of range 1-50'),
-            _v_wrap(not config.ctf_high_res > 1,
-                    'CTF high resolution out of range 1-50'),
-            _v_wrap(config.ctf_low_res < config.ctf_high_res,
-                    'CTF high resolution lower than CTF low resolution'),
-            _v_wrap(not config.defocus_search_min > 0,
-                    'Defocus search minimum out of range 0-10'),
-            _v_wrap(not config.defocus_search_min < 10,
-                    'defocus search minimum out of range 0-10'),
-            _v_wrap(not config.defocus_search_max > 0,
-                    'Defocus search maximum out of range 0-100'),
-            _v_wrap(not config.defocus_search_max < 100,
-                    'Defocus search maximum out of range 0-100'),
-            _v_wrap(config.defocus_search_min > config.defocus_search_max,
-                    'Defocus search min higher than defocus search max'),
-            _v_wrap(config.scipion_config_path is None,
-                    'Scipion configuration path could not be generated'),
-            _v_wrap(pathlib.Path(config.scipion_config_path).exists(),
-                    'Scipion configuration file %s already exists.\
-                    select a unique project name.' %
-                    config.scipion_config_path),
-        ]))
-
-# TODO: commandline specs, prompting
-# TODO: validators
-# TODO: actually use it
+            input('Path to save scipion template: '))
