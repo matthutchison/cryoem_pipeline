@@ -21,7 +21,7 @@ This application also requires the ```transitions``` python module (available on
 ```shell
 pip install -r requirements.txt
 ```
-**Note:** You are encouraged to run in a virtual environment or separate installation, but that configuration is left up to the user.
+**Note:** It is generally not advised to globally install python packages. One approach that works well is to pull the package down and place it near or in the pipeline install, then write a wrapper script for pipeline that sets PYTHONPATH to the location of the transitions package. Virtualenvs may also be an effective approach.
 
 ### Installation
 

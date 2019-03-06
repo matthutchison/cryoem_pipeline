@@ -163,22 +163,6 @@ class Config():
         }
 
 
-class SystemConfig():
-    '''Container for system configuration values
-    '''
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-    def _set_keyword_values(self, **kwargs):
-        self.working_directory = kwargs.get('working_directory')
-        self.src_globus_id = kwargs.get('src_endpoint_id')
-        self.src_globus_path = kwargs.get('src_endpoint_path')
-        self.dest_globus_id = kwargs.get('dest_endpoint_id')
-        self.dest_globus_path = kwargs.get('dest_endpoint_path')
-        self.logging_path = kwargs.get('log_file')
-        self.default_template = kwargs.get('default_scipion_template_path')
-
-
 class ScipionTemplate():
     '''Container for project configuration values
     '''
