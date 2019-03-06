@@ -67,6 +67,7 @@ class Project():
                     model.initialize()
                     await asyncio.sleep(self.workflow.MIN_IMPORT_INTERVAL)
                 await asyncio.sleep(2)
+                self._reload_local_vars()
         except StopAsyncIteration:
             import sys
             sys.exit(0)
@@ -216,7 +217,7 @@ class WorkflowItem():
     def on_enter_creating(self):
         '''Check that the file has finished creation, then transition state
 
-        Since we're using network file systems here, we're using a simple check
+        Since network file systems are common here, we're using a simple check
         to see if the file has been modified recently instead of something
         fancier like inotify.
         '''
