@@ -47,14 +47,15 @@ class Config():
 
     def prompt_user_configs(self):
         user_configs = [c for c in pathlib.Path(
-                        APPLICATION_PATH, '/config').glob('*.json')]
+                        APPLICATION_PATH, 'config/user').glob('*.json')]
+        print(APPLICATION_PATH)
         print('Which configurations would you like to load?')
         print('\n'.join(('(%i) %s' % e for e in enumerate(user_configs))))
-        choices = [user_configs[int(c.trim())] for c in
+        choices = [user_configs[int(c.strip())] for c in
                    input('Choices (separate multiple with commas): ')
                    .split(sep=',')]
         for choice in choices:
-            self.load(pathlib.Path(APPLICATION_PATH, '/config', choice))
+            self.load(pathlib.Path(APPLICATION_PATH, 'config/user', choice))
 
     def prompt_for_unset_values(self):
         for k, v in self.config_options.items():
@@ -187,6 +188,7 @@ class ScipionTemplate():
         self.ctf_high_res = self.config.get('ctf_high_resolution')
         self.defocus_search_min = self.config.get('defocus_search_minimum')
         self.defocus_search_max = self.config.get('defocus_search_maximum')
+        self.voltage = self.config.get('voltage')
         self.scipion_config_path = pathlib.Path(
             self.config.get('run_config_directory'),
             self.config.get('project_name'))
@@ -254,6 +256,7 @@ class ScipionTemplate():
         imp['samplingRate'] = config.image_pixel_size
         imp['scannedPixelSize'] = config.physical_pixel_size
         imp['gainFile'] = config.path_to_gainref
+        imp['voltage'] = config.voltage
 
         ctf['minDefocus'] = config.defocus_search_min
         ctf['maxDefocus'] = config.defocus_search_max
