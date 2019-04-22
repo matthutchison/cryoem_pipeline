@@ -71,17 +71,15 @@ async def compress_file(path, force=False):
 
     Defaults are set for the ATC linux box to not saturate. Adjust if necessary
     '''
-    cmd = ['lbzip2', '-k', '-n 8', '-z', str(path)]
+    cmd = ['lbzip2', '-k', '-z', str(path)]
     cmd.insert(1, '-f') if force else None
     return await _wait_subprocess_exec(cmd)
 
 
 async def uncompress_file(path, force=False):
     '''Uncompress the file using lbzip2. Returns only after uncompress complete.
-
-    Defaults are set for the ATC linux box to not saturate.
     '''
-    cmd = ['lbzip2', '-k', '-n 4', '-d', str(path)]
+    cmd = ['lbzip2', '-k', '-d', str(path)]
     cmd.insert(1, '-f') if force else None
     return await _wait_subprocess_exec(cmd)
 
@@ -93,6 +91,16 @@ async def convert_to_mrc(src, dest):
     motioncor2 expects.
     '''
     cmd = ['newstack', '-bytes', '0', str(src), str(dest)]
+    return await _communicate_subprocess_exec(cmd)
+
+
+async def bin_by_two(src, dest):
+    '''Bin image by two using newstack.
+
+    The -bytes 0 flag is to force the unsigned integer conversion that
+    motioncor2 expects.
+    '''
+    cmd = ['newstack', '-bytes', '0', '-bin', '2', str(src), str(dest)]
     return await _communicate_subprocess_exec(cmd)
 
 
