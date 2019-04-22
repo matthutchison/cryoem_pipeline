@@ -1,5 +1,6 @@
 #Project-specific
 config/user
+config/system
 
 # Mac-specific
 .DS_Store
