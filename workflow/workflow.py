@@ -3,7 +3,8 @@ from workflow.monitor import FilePatternMonitor
 from workflow.utilities import (safe_copy_file, compare_hashes, compress_file,
                                 uncompress_file, stack_files, globus_transfer,
                                 create_scipion_project, start_scipion_project,
-                                convert_to_mrc)
+                                convert_to_mrc,
+                                globus_endpoint_get_remaining_activation,)
 import asyncio
 import logging
 import os
@@ -22,6 +23,8 @@ class Project():
         self.project = self.config.config_options.get('project_name')
         self.workflow = Workflow()
         self.awh = AsyncWorkflowHelper()
+        self._verify_globus_activation(
+            config.config_options.get('globus_destination_endpoint_id'))
         self.monitor = FilePatternMonitor(
             self.config.config_options.get('source_pattern'), recursive=True)
         self._reload_local_vars()
@@ -47,8 +50,8 @@ class Project():
         self.frames = c.get('frames_to_stack')
         self.workflow.MIN_IMPORT_INTERVAL = \
             c.get('minimum_import_interval') / self.frames
-        self.SRC_GLOBUS_ENDPOINT = c.get('globus_source_endpoint_id')
-        self.DEST_GLOBUS_ENDPOINT = c.get('globus_destination_endpoint_id')
+        self.src_globus_endpoint = c.get('globus_source_endpoint_id')
+        self.dest_globus_endpoint = c.get('globus_destination_endpoint_id')
 
     def start(self):
         self._transfer_loop()
@@ -94,6 +97,20 @@ class Project():
             done_cb=self._transfer_loop
         )
 
+    def _verify_globus_activation(self, endpoint):
+        if endpoint:
+            print('Verifying globus')
+            remaining = self.awh.loop.run_until_complete(
+                globus_endpoint_get_remaining_activation(endpoint))
+            if remaining == 0:
+                print('Your globus destination endpoint is not activated.')
+            elif remaining != -1 and remaining < 3600*48:
+                print('''You have %i hours left on your endpoint activation.
+Reactivate your globus endpoint if the run will last longer than that'''
+                      % (remaining/3600))
+            logger.info('%i hours of globus activation remaining'
+                        % (remaining/3600))
+
     async def _schedule_globus_transfer(self, pre_wait=1800):
         '''Schedule the globus transfer for synchronization after a wait time
 
@@ -104,8 +121,8 @@ class Project():
             raise KeyError('Project name must not be empty.')
         await asyncio.sleep(pre_wait)
         await globus_transfer(
-            self.SRC_GLOBUS_ENDPOINT + ':/' + str(self.project),
-            self.DEST_GLOBUS_ENDPOINT + ':' + self.paths['globus_root'],
+            self.src_globus_endpoint + ':/' + str(self.project),
+            self.dest_globus_endpoint + ':' + self.paths['globus_root'],
             '-s', 'mtime',
             '-r',
             '--preserve-mtime',
