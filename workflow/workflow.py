@@ -19,19 +19,17 @@ class Project():
 
     def __init__(self, config):
         self.config = config
-        self.project = self.config.config_options['project_name']
+        self.project = self.config.config_options.get('project_name')
         self.workflow = Workflow()
         self.awh = AsyncWorkflowHelper()
         self.monitor = FilePatternMonitor(
-            self.config.config_options['source_pattern'], recursive=True)
-        self._set_local_vars()
+            self.config.config_options.get('source_pattern'), recursive=True)
+        self._reload_local_vars()
         self._ensure_root_directories()
         if self.frames > 1:
             self._ensure_directory(str(
                 pathlib.Path(self.paths['local_root']).joinpath(
                     pathlib.Path('stack'))))
-        self.workflow.MIN_IMPORT_INTERVAL = \
-            self.workflow.MIN_IMPORT_INTERVAL / self.frames
 
     def _reload_local_vars(self):
         self.config.reload()

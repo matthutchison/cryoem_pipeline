@@ -25,4 +25,12 @@ pip install -r requirements.txt
 
 ### Installation
 
-Setup is currently a very manual process, requiring multiple hardcoded options to be changed to fit the target system. All of this is planned to move to a config file that make much more sense; once that happens this section will be fleshed out more.
+Setup is currently a very manual process, requiring multiple hardcoded options to be changed to fit the target system. All of this is planned to move to a config file that make much more sense; once that happens this section will be fleshed out more.  Some useful tips are listed here.
+
+- Clone the repository to the target machine using
+```shell
+git clone https://github.com/abcsFrederick/cryoem_pipeline.git
+```
+- Add appropriate configuration files to the cryoem_pipeline/config/system/ and cryoem_pipeline/config/user/ directories. README files in each will give you more information about what to put there.  Not all values need to be set in configuration files; the application will prompt for expected values that it does not find prior to fully initializing the application.
+- Put the working directory on a with high throughput and enough space to have 20-30 files in-process at any given time. We use at least 100GB and SATA or NVME SSD's (or in-memory drives) as our scratch space. Do not use a networked drive for "working_directory"
+- The storage directory must have enough space to hold the entire compressed dataset; this directory is the final resting place of data pre-globus-transfer and in the interest of safety is not cleaned up by the pipeline.

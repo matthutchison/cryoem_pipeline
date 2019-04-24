@@ -1,6 +1,6 @@
 #Project-specific
-config/user
-config/system
+config/user/*.json
+config/system/*.json
 
 # Mac-specific
 .DS_Store
