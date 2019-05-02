@@ -66,10 +66,11 @@ if __name__ == '__main__':
         path=pathlib.Path(config.config_options.get('run_config_directory'),
                           config.config_options['project_name'] + '.json'))
     template = ScipionTemplate(config)
-    template.generate_config()
+    template.generate_template()
     logging.basicConfig(
         level=getattr(logging, args.debug) if args.debug else logging.WARNING)
-    logging.handlers.SysLogHandler(address=config.logger)
+    logging.handlers.SysLogHandler(
+        address=config.config_options.get('system_logger'))
     logger = logging.getLogger(__name__)
     if os.fork():
         sys.exit()
