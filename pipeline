@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from workflow.workflow import Project
-from workflow.config import Config, ScipionTemplate
+from workflow.config import Config, ScipionTemplate, APPLICATION_PATH
 import argparse
 import logging
 import logging.handlers
@@ -55,7 +55,10 @@ if __name__ == '__main__':
     args = _parse_arguments()
     _check_applications()
     config = Config()
-    config.load(pathlib.Path('config/default/base_system_config.json'))
+    config.load(pathlib.Path(
+                APPLICATION_PATH, 'config/default/base_system_config.json'))
+    config.load(pathlib.Path(
+                APPLICATION_PATH, 'config/system').glob('*.json'))
     config.prompt_user_configs()
     config.prompt_for_unset_values()
     config.validate_all()

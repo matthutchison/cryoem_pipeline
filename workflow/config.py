@@ -26,8 +26,6 @@ class Config():
         self.config_options = dict()
         self.validators = self._get_default_validators()
         self.path = None
-        self.load(pathlib.Path(
-            APPLICATION_PATH, 'config/system').glob('*.json'))
 
     def __str__(self):
         from pprint import pformat
