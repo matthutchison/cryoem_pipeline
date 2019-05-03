@@ -1,8 +1,9 @@
 {
+    "project_name": null,
     "system_logger": "/dev/log",
     "working_directory": "/tmp",
     "storage_directory": "/mnt/nas",
-    "scipion_template_path": "workflow_template.json",
+    "scipion_template_path": "workflow/workflow_template.json",
     "run_config_directory": "/tmp",
     "globus_source_endpoint_id": null,
     "globus_destination_endpoint_id": null,
