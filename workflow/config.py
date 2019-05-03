@@ -56,11 +56,23 @@ class Config():
             self.load(pathlib.Path(APPLICATION_PATH, 'config/user', choice))
 
     def prompt_for_unset_values(self):
+        def fix_special(v):
+            if v.lower() in ['y', 'n', 'yes', 'no']:
+                v = True if v.lower()[0] == 'y' else False
+            else:
+                try:
+                    v = int(v)
+                except ValueError:
+                    try:
+                        v = float(v)
+                    except ValueError:
+                        pass
+            return v
         for k, v in self.config_options.items():
             if v is None:
                 new = input('Set value for %s?: ' % k)
                 if new:
-                    self.config_options[k] = new
+                    self.config_options[k] = fix_special(new)
 
     def reload(self):
         config = self._load_config_file(self.path)
@@ -128,9 +140,9 @@ class Config():
             'globus_destination_endpoint_id': [
                 lambda v: v is None or bool(UUID(v))],
             'globus_source_endpoint_path': [
-                lambda v: v is None or bool(UUID(v))],
+                lambda v: v is None or pathlib.Path(v)],
             'globus_destination_endpoint_path': [
-                lambda v: v is None or bool(UUID(v))],
+                lambda v: v is None or pathlib.Path(v)],
             'project_name': [
                 lambda v: bool(v)],
             'gain_reference_path': [
@@ -170,30 +182,35 @@ class ScipionTemplate():
     def __init__(self, config):
         if config.validate_all():
             self.config = config.config_options
+            self._set_keyword_values()
         else:
             sys.exit('Configuration not validated prior to template generation.\
                      exiting.')
 
     def _set_keyword_values(self):
-        self.project_name = self.config.get('project_name')
-        self.source_pattern = self.config.get('source_pattern')
-        self.path_to_gainref = self.config.get('gain_reference_path')
-        self.frames_to_stack = self.config.get('frames_to_stack')
-        self.physical_pixel_size = self.config.get('physical_pixel_size')
-        self.image_pixel_size = self.config.get('image_pixel_size')
-        self.super_resolution = self.config.get('super_resolution')
-        self.ctf_low_res = self.config.get('ctf_low_resolution')
-        self.ctf_high_res = self.config.get('ctf_high_resolution')
-        self.defocus_search_min = self.config.get('defocus_search_minimum')
-        self.defocus_search_max = self.config.get('defocus_search_maximum')
-        self.voltage = self.config.get('voltage')
+        config = self.config
+        self.project_name = config.get('project_name')
+        self.source_pattern = config.get('source_pattern')
+        self.working_directory = config.get('working_directory')
+        self.path_to_gainref = config.get('gain_reference_path')
+        self.frames_to_stack = config.get('frames_to_stack')
+        self.physical_pixel_size = config.get('physical_pixel_size')
+        self.image_pixel_size = config.get('image_pixel_size')
+        self.super_resolution = config.get('super_resolution')
+        self.ctf_low_res = config.get('ctf_low_resolution')
+        self.ctf_high_res = config.get('ctf_high_resolution')
+        self.defocus_search_min = config.get('defocus_search_minimum')
+        self.defocus_search_max = config.get('defocus_search_maximum')
+        self.voltage = config.get('voltage')
         self.scipion_config_path = pathlib.Path(
-            self.config.get('run_config_directory'),
-            self.config.get('project_name'))
+            config.get('run_config_directory'),
+            config.get('project_name') + '-scipion-template.json')
 
     def generate_template(self):
         self.get_config_values()
-        self.load_template(self.config['scipion_template_path'])
+        self.load_template(pathlib.Path(
+            APPLICATION_PATH,
+            self.config.get('scipion_template_path')))
         self.template_insert_values()
         self.write_template(self.scipion_config_path)
 
@@ -204,12 +221,12 @@ class ScipionTemplate():
     def _load_template(path):
         '''Loads the Scipion JSON template from path.
         '''
-        if not os.path.exists(path):
+        if not os.path.exists(str(path)):
             raise FileNotFoundError(
                 errno.ENOENT,
                 os.strerror(errno.ENOENT),
                 path)
-        with open(path, mode='r', encoding='utf8') as f:
+        with open(str(path), mode='r', encoding='utf8') as f:
             try:
                 temp = json.loads(f.read())
             except json.JSONDecodeError:
@@ -225,12 +242,12 @@ class ScipionTemplate():
 
         Should only be called after filling the template with data.
         '''
-        if os.path.exists(path) and not force:
+        if os.path.exists(str(path)) and not force:
             raise FileExistsError(
                 errno.EEXIST,
                 os.strerror(errno.EEXIST),
                 path)
-        with open(path, mode='w', encoding='utf8') as f:
+        with open(str(path), mode='w', encoding='utf8') as f:
             f.write(json.dumps(data, sort_keys=True, indent=4))
             f.close()
 
@@ -287,13 +304,10 @@ class ScipionTemplate():
         config.image_pixel_size = float(
             config.image_pixel_size or
             input('Image pixel size (Å): '))
-        _super_res = (
-            config.super_resolution or
-            input('Are you running super resolution (y/n): '))
-        config.super_resolution = (True if
-                                   _super_res is True or
-                                   _super_res[0] in ('y', 'Y')
-                                   else False)
+        config.super_resolution = (
+            config.super_resolution if config.super_resolution is not None else
+            (True if input('Are you running super resolution (y/n): ')[0] in
+                ('y', 'Y') else False))
         config.ctf_low_res = float(
             config.ctf_low_res or
             input('CTF search low resolution bound (30?) (Å): '))
