@@ -58,6 +58,8 @@ if __name__ == '__main__':
     config.load(pathlib.Path(
                 APPLICATION_PATH, 'config/default/base_system_config.json'))
     config.load(pathlib.Path(
+                APPLICATION_PATH, 'config/default/example_project_config.json'))
+    config.load(pathlib.Path(
                 APPLICATION_PATH, 'config/system').glob('*.json'))
     config.prompt_user_configs()
     config.prompt_for_unset_values()

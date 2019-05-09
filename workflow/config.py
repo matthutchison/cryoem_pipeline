@@ -150,7 +150,7 @@ class Config():
                 lambda v: pathlib.Path(v).exists()],
             'source_pattern': [
                 lambda v: bool(v),
-                lambda v: len(glob(v), recursive=True) > 0],
+                lambda v: len(glob(v, recursive=True)) > 0],
             'frames_to_stack': [
                 lambda v: bool(v),
                 lambda v: 0 < v < 100],
@@ -181,14 +181,14 @@ class ScipionTemplate():
     '''
     def __init__(self, config):
         if config.validate_all():
-            self.config = config.config_options
+            self.config = config
             self._set_keyword_values()
         else:
             sys.exit('Configuration not validated prior to template generation.\
                      exiting.')
 
     def _set_keyword_values(self):
-        config = self.config
+        config = self.config.config_options
         self.project_name = config.get('project_name')
         self.source_pattern = config.get('source_pattern')
         self.working_directory = config.get('working_directory')
@@ -210,7 +210,7 @@ class ScipionTemplate():
         self.get_config_values()
         self.load_template(pathlib.Path(
             APPLICATION_PATH,
-            self.config.get('scipion_template_path')))
+            self.config.config_options.get('scipion_template_path')))
         self.template_insert_values()
         self.write_template(self.scipion_config_path)
 

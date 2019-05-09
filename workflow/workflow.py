@@ -45,7 +45,7 @@ class Project():
             'globus_root': (c.get('globus_destination_endpoint_path') +
                             c.get('project_name')),
             'scipion_template': str(pathlib.Path(c.get('run_config_directory'),
-                                                 c.get('projecft_name')))
+                                                 c.get('project_name')))
         }
         self.frames = c.get('frames_to_stack')
         self.workflow.MIN_IMPORT_INTERVAL = \
